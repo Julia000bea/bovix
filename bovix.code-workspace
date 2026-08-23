@@ -1,0 +1,18 @@
+{
+  "folders": [
+    { "name": "backend (Java)", "path": "backend" },
+    { "name": "frontend (React)", "path": "frontend" }
+  ],
+  "settings": {
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "maven.executable.preferMavenWrapper": true
+  },
+  "extensions": {
+    "recommendations": [
+      "vscjava.vscode-java-pack",
+      "vmware.vscode-spring-boot",
+      "dbaeumer.vscode-eslint",
+      "bradlc.vscode-tailwindcss"
+    ]
+  }
+}

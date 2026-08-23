@@ -1,0 +1,17 @@
+# Sobe apenas o PostgreSQL para desenvolvimento local.
+# Backend (mvn spring-boot:run) e frontend (npm run dev) rodam fora do compose.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bovix-postgres
+    environment:
+      POSTGRES_DB: bovix
+      POSTGRES_USER: bovix
+      POSTGRES_PASSWORD: bovix
+    ports:
+      - "5433:5432"
+    volumes:
+      - bovix_pgdata:/var/lib/postgresql/data
+
+volumes:
+  bovix_pgdata:
