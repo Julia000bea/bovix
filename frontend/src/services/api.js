@@ -1,5 +1,9 @@
 // Cliente HTTP central: todas as chamadas à API Java passam por aqui.
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+if (import.meta.env.PROD && !configuredApiUrl) {
+  throw new Error("VITE_API_URL não foi configurada no build de produção.");
+}
+const API_URL = (configuredApiUrl || "http://localhost:8080/api").replace(/\/+$/, "");
 
 const TOKEN_KEY = "bovix_token";
 const FAZENDA_KEY = "bovix_fazenda_id";
@@ -21,10 +25,19 @@ async function request(path, options = {}) {
   const token = authStorage.getToken();
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+    ...options.headers,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch (error) {
+    throw new Error(
+      `Não foi possível conectar à API (${API_URL}). Verifique VITE_API_URL, HTTPS e CORS.`,
+      { cause: error },
+    );
+  }
 
   if (res.status === 401) {
     authStorage.clear();
