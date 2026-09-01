@@ -25,6 +25,11 @@ public class ReproducaoController {
         return ResponseEntity.ok(service.criar(animalId, dados));
     }
 
+    @PutMapping("/reproducao/{id}/confirmar-cio")
+    public ResponseEntity<EventoReproducao> confirmarCio(@PathVariable Long id) {
+        return ResponseEntity.ok(service.confirmarCio(id));
+    }
+
     @DeleteMapping("/reproducao/{id}")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
         service.remover(id);

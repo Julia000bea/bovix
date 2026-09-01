@@ -21,17 +21,28 @@ public class EventoReproducao {
     @JsonIgnore
     private Animal animal;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private String tipo;
 
     @Column(nullable = false)
     private LocalDate data;
 
+    @Column(name = "data_confirmacao")
+    private LocalDate dataConfirmacao;
+
     @Column(length = 255)
     private String detalhe;
 
-    @Column(length = 20)
+    @Column(length = 255)
     private String resultado;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cio_vinculado_id")
+    @JsonIgnore
+    private EventoReproducao cioVinculado;
+
+    @Column(name = "previsao_parto")
+    private LocalDate previsaoParto;
 
     @Column(name = "criado_em", updatable = false)
     private LocalDateTime criadoEm;
@@ -45,5 +56,11 @@ public class EventoReproducao {
     @JsonProperty("animalId")
     public Long getAnimalId() {
         return animal != null ? animal.getId() : null;
+    }
+
+    @Transient
+    @JsonProperty("cioVinculadoId")
+    public Long getCioVinculadoId() {
+        return cioVinculado != null ? cioVinculado.getId() : null;
     }
 }

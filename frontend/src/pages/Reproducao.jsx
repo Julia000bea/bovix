@@ -1,34 +1,115 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Circle } from "lucide-react";
 import { Field, EmptyState, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, TIPOS_REPRO, fMono } from "../utils/tokens";
-import { formatDate } from "../utils/date";
+import { formatDate, todayStr } from "../utils/date";
 import { novoEventoReproducao } from "../models/EventoReproducao";
 import { rotuloAnimal } from "../models/Animal";
 import { reproducaoService } from "../services/reproducaoService";
-import { animaisService } from "../services/animaisService";
 
 export default function Reproducao({ data }) {
   const { animais, setAnimais, reproducao, setReproducao } = data;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(novoEventoReproducao());
   const [salvando, setSalvando] = useState(false);
+  const [registrandoReproducao, setRegistrandoReproducao] = useState(null);
+  const [modalReproducao, setModalReproducao] = useState({
+    aberta: false,
+    cioId: null,
+    animalId: null,
+    tipoReproducao: "inseminacao", // "touro" ou "inseminacao"
+    formReproducao: {
+      dataReproducao: "",
+      touroDados: "", // Touro utilizado
+      observacoes: "",
+      semenCodigo: "", // Código/nome do sêmen
+    },
+  });
 
   const add = async () => {
-    if (!form.animalId) return;
+    if (!form.animalId || !form.tipo) return;
     setSalvando(true);
     try {
       const criado = await reproducaoService.criar(form.animalId, form);
       setReproducao((prev) => [...prev, criado]);
 
       if (form.tipo === "parto") {
-        setAnimais((prev) => prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca lactante" } : a)));
-      } else if (form.tipo === "secagem") {
-        setAnimais((prev) => prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca seca" } : a)));
+        setAnimais((prev) =>
+          prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca lactante" } : a))
+        );
+      } else if (form.tipo === "secagem" || form.tipo === "pre_parto") {
+        setAnimais((prev) =>
+          prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca seca" } : a))
+        );
       }
+
       setForm(novoEventoReproducao());
       setOpen(false);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarCio = async (cioId) => {
+    setSalvando(true);
+    try {
+      const atualizado = await reproducaoService.confirmarCio(cioId);
+      setReproducao((prev) => prev.map((e) => (e.id === cioId ? atualizado : e)));
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirRegistroReproducao = (cioId, animalId) => {
+    const cio = reproducao.find((e) => e.id === cioId);
+    setModalReproducao({
+      aberta: true,
+      cioId,
+      animalId,
+      cioData: cio?.data,
+      tipoReproducao: "inseminacao",
+      formReproducao: {
+        dataReproducao: "",
+        touroDados: "",
+        observacoes: "",
+        semenCodigo: "",
+      },
+    });
+  };
+
+  const salvarReproducao = async () => {
+    const { cioId, animalId, tipoReproducao, formReproducao } = modalReproducao;
+    const { dataReproducao, touroDados, observacoes, semenCodigo } = formReproducao;
+
+    if (!dataReproducao) {
+      alert("Data da reprodução/inseminação é obrigatória");
+      return;
+    }
+
+    if (tipoReproducao === "touro" && !touroDados) {
+      alert("Touro utilizado é obrigatório");
+      return;
+    }
+
+    if (tipoReproducao === "inseminacao" && !semenCodigo) {
+      alert("Código/nome do sêmen é obrigatório");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      const novaReproducao = {
+        animalId,
+        tipo: tipoReproducao === "touro" ? "reproducao" : "inseminacao",
+        data: dataReproducao,
+        detalhe: tipoReproducao === "touro" ? `${touroDados}\n${observacoes}` : semenCodigo,
+        cioVinculadoId: cioId,
+      };
+
+      const criada = await reproducaoService.criar(animalId, novaReproducao);
+      setReproducao((prev) => [...prev, criada]);
+      setModalReproducao({ ...modalReproducao, aberta: false });
     } finally {
       setSalvando(false);
     }
@@ -39,62 +120,372 @@ export default function Reproducao({ data }) {
     setReproducao((prev) => prev.filter((e) => e.id !== id));
   };
 
-  const eventos = [...reproducao].sort((a, b) => (a.data < b.data ? 1 : -1));
+  const agrupadosPorAnimal = animais.map((animal) => ({
+    animal,
+    eventos: reproducao.filter((e) => e.animalId === animal.id).sort((a, b) => new Date(b.data) - new Date(a.data)),
+  }));
+
+  const comEventos = agrupadosPorAnimal.filter((g) => g.eventos.length > 0);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.cio, color: "#fff" }}>
-          <Plus size={16} /> Novo registro
+        <button
+          onClick={() => {
+            setRegistrandoReproducao(null);
+            setOpen((o) => !o);
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold"
+          style={{ backgroundColor: C.cio, color: "#fff" }}
+        >
+          <Plus size={16} /> Novo evento
         </button>
       </div>
 
       {open && (
         <div className="rounded-xl border bg-white p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.line }}>
-          <Field label="Animal *"><AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
+          {!registrandoReproducao && (
+            <Field label="Animal *">
+              <AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} />
+            </Field>
+          )}
+          {registrandoReproducao && (
+            <Field label="Animal">
+              <input
+                className={inputCls}
+                style={inputStyle}
+                value={rotuloAnimal(animais.find((a) => a.id === form.animalId))}
+                disabled
+              />
+            </Field>
+          )}
+
           <Field label="Tipo de evento">
             <select className={inputCls} style={inputStyle} value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-              {TIPOS_REPRO.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+              {TIPOS_REPRO.map((t) => (
+                <option key={t.v} value={t.v}>
+                  {t.l}
+                </option>
+              ))}
             </select>
           </Field>
-          <Field label="Data"><input type="date" className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
+
+          <Field label="Data">
+            <input
+              type="date"
+              className={inputCls}
+              style={inputStyle}
+              value={form.data}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+            />
+          </Field>
+
           {form.tipo === "inseminacao" && (
-            <Field label="Touro / sêmen utilizado"><input className={inputCls} style={inputStyle} value={form.detalhe} onChange={(e) => setForm({ ...form, detalhe: e.target.value })} /></Field>
+            <Field label="Touro / Sêmen utilizado">
+              <input className={inputCls} style={inputStyle} value={form.detalhe} onChange={(e) => setForm({ ...form, detalhe: e.target.value })} />
+            </Field>
           )}
-          {form.tipo === "diagnostico" && (
-            <Field label="Resultado">
+
+          {form.tipo === "diagnostico_prenhez" && (
+            <Field label="Resultado do diagnóstico">
               <select className={inputCls} style={inputStyle} value={form.resultado} onChange={(e) => setForm({ ...form, resultado: e.target.value })}>
-                <option value="positivo">Positivo (prenha)</option>
-                <option value="negativo">Negativo (vazia)</option>
+                <option value="">Selecione...</option>
+                <option value="prenhe">Prenhe</option>
+                <option value="vazia">Vazia (não prenha)</option>
               </select>
             </Field>
           )}
-          {form.tipo === "parto" && (
-            <Field label="Observações (sexo da cria, ocorrências)"><input className={inputCls} style={inputStyle} value={form.detalhe} onChange={(e) => setForm({ ...form, detalhe: e.target.value })} /></Field>
+
+          {form.tipo === "prenhez_confirmada" && (
+            <Field label="Data prevista do parto (280 dias após inseminação)">
+              <input
+                type="date"
+                className={inputCls}
+                style={inputStyle}
+                value={form.previsaoParto}
+                onChange={(e) => setForm({ ...form, previsaoParto: e.target.value })}
+              />
+            </Field>
           )}
+
+          {form.tipo === "parto" && (
+            <Field label="Observações (sexo da cria, ocorrências)">
+              <input className={inputCls} style={inputStyle} value={form.detalhe} onChange={(e) => setForm({ ...form, detalhe: e.target.value })} />
+            </Field>
+          )}
+
           <div className="sm:col-span-2 flex justify-end gap-2">
-            <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
-            <button onClick={add} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
-              {salvando ? "Salvando…" : "Salvar registro"}
+            <button
+              onClick={() => {
+                setOpen(false);
+                setRegistrandoReproducao(null);
+                setForm(novoEventoReproducao());
+              }}
+              className="px-3 py-2 text-sm rounded-lg"
+              style={{ color: C.inkSoft }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={add}
+              disabled={salvando}
+              className="px-4 py-2 text-sm rounded-lg font-semibold"
+              style={{ backgroundColor: C.pasto900, color: "#fff" }}
+            >
+              {salvando ? "Salvando…" : "Salvar evento"}
             </button>
           </div>
         </div>
       )}
 
-      {eventos.length === 0 ? (
+      {/* Modal para Registrar Reprodução */}
+      {modalReproducao.aberta && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
+            {/* Cabeçalho da Modal */}
+            <div className="mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: C.ink }}>
+                🧬 Registrar Reprodução
+              </h2>
+              <p className="text-xs mt-2" style={{ color: C.inkSoft }}>
+                Vínculo com cio de origem
+              </p>
+            </div>
+
+            {/* Informações do Animal e Cio de Origem */}
+            <div className="p-3 rounded-lg mb-4" style={{ backgroundColor: C.pasto50 }}>
+              <p className="text-sm font-semibold" style={{ color: C.ink }}>
+                🐄 {rotuloAnimal(animais.find((a) => a.id === modalReproducao.animalId))}
+              </p>
+              <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
+                Cio de origem: <span style={{ ...fMono, color: C.pasto900 }}>{formatDate(modalReproducao.cioData)}</span>
+              </p>
+            </div>
+
+            {/* Seleção do Tipo de Reprodução */}
+            <Field label="Tipo de reprodução *">
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="tipoReproducao"
+                    value="touro"
+                    checked={modalReproducao.tipoReproducao === "touro"}
+                    onChange={(e) =>
+                      setModalReproducao({
+                        ...modalReproducao,
+                        tipoReproducao: e.target.value,
+                        formReproducao: {
+                          ...modalReproducao.formReproducao,
+                          dataReproducao: "",
+                          touroDados: "",
+                          observacoes: "",
+                        },
+                      })
+                    }
+                  />
+                  <span className="text-sm font-medium">Touro / Monta natural</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="tipoReproducao"
+                    value="inseminacao"
+                    checked={modalReproducao.tipoReproducao === "inseminacao"}
+                    onChange={(e) =>
+                      setModalReproducao({
+                        ...modalReproducao,
+                        tipoReproducao: e.target.value,
+                        formReproducao: {
+                          ...modalReproducao.formReproducao,
+                          dataReproducao: "",
+                          touroDados: "",
+                          semenCodigo: "",
+                        },
+                      })
+                    }
+                  />
+                  <span className="text-sm font-medium">Inseminação artificial</span>
+                </label>
+              </div>
+            </Field>
+
+            {/* Campo de Data (obrigatório) */}
+            <Field label={modalReproducao.tipoReproducao === "touro" ? "Data da reprodução *" : "Data da inseminação *"}>
+              <input
+                type="date"
+                className={inputCls}
+                style={inputStyle}
+                value={modalReproducao.formReproducao.dataReproducao}
+                onChange={(e) =>
+                  setModalReproducao({
+                    ...modalReproducao,
+                    formReproducao: { ...modalReproducao.formReproducao, dataReproducao: e.target.value },
+                  })
+                }
+              />
+            </Field>
+
+            {/* Campos específicos para Touro */}
+            {modalReproducao.tipoReproducao === "touro" && (
+              <>
+                <Field label="Touro utilizado *">
+                  <input
+                    type="text"
+                    className={inputCls}
+                    style={inputStyle}
+                    placeholder="Nome ou ID do touro"
+                    value={modalReproducao.formReproducao.touroDados}
+                    onChange={(e) =>
+                      setModalReproducao({
+                        ...modalReproducao,
+                        formReproducao: { ...modalReproducao.formReproducao, touroDados: e.target.value },
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Observação">
+                  <input
+                    type="text"
+                    className={inputCls}
+                    style={inputStyle}
+                    placeholder="Observações sobre a monta"
+                    value={modalReproducao.formReproducao.observacoes}
+                    onChange={(e) =>
+                      setModalReproducao({
+                        ...modalReproducao,
+                        formReproducao: { ...modalReproducao.formReproducao, observacoes: e.target.value },
+                      })
+                    }
+                  />
+                </Field>
+              </>
+            )}
+
+            {/* Campos específicos para Inseminação Artificial */}
+            {modalReproducao.tipoReproducao === "inseminacao" && (
+              <Field label="Código/nome do sêmen ou touro *">
+                <input
+                  type="text"
+                  className={inputCls}
+                  style={inputStyle}
+                  placeholder="Código do sêmen ou nome do touro"
+                  value={modalReproducao.formReproducao.semenCodigo}
+                  onChange={(e) =>
+                    setModalReproducao({
+                      ...modalReproducao,
+                      formReproducao: { ...modalReproducao.formReproducao, semenCodigo: e.target.value },
+                    })
+                  }
+                />
+              </Field>
+            )}
+
+            {/* Botões de Ação */}
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => setModalReproducao({ ...modalReproducao, aberta: false })}
+                disabled={salvando}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold"
+                style={{ color: C.inkSoft, borderColor: C.line, border: "1px solid" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={salvarReproducao}
+                disabled={salvando}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                style={{ backgroundColor: C.pasto900, opacity: salvando ? 0.6 : 1 }}
+              >
+                {salvando ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {comEventos.length === 0 ? (
         <EmptyState text="Nenhum evento reprodutivo registrado. Cios, inseminações e partos aparecem aqui." />
       ) : (
-        <div className="flex flex-col gap-2">
-          {eventos.map((e) => (
-            <div key={e.id} className="rounded-xl border bg-white p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
-              <span className="text-xs rounded-md px-2 py-1 shrink-0" style={{ ...fMono, backgroundColor: C.pasto50, color: C.pasto900 }}>{formatDate(e.data)}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium" style={{ color: C.ink }}>{TIPOS_REPRO.find((t) => t.v === e.tipo)?.l} — {rotuloAnimal(animais.find((a) => a.id === e.animalId))}</p>
-                {(e.detalhe || e.resultado) && (
-                  <p className="text-xs" style={{ color: C.inkSoft }}>{e.tipo === "diagnostico" ? (e.resultado === "positivo" ? "Prenha" : "Vazia") : e.detalhe}</p>
-                )}
+        <div className="flex flex-col gap-4">
+          {comEventos.map(({ animal, eventos }) => (
+            <div key={animal.id} className="rounded-xl border bg-white p-4" style={{ borderColor: C.line }}>
+              <h3 className="font-semibold mb-3" style={{ color: C.ink }}>
+                {rotuloAnimal(animal)}
+              </h3>
+              <div className="space-y-3">
+                {eventos.map((e) => (
+                  <div key={e.id} className="p-3 rounded-lg border" style={{ borderColor: C.line, backgroundColor: "#fafaf8" }}>
+                    <div className="flex items-start gap-3">
+                      {/* Ícone de status */}
+                      <div className="pt-1">
+                        {e.tipo === "cio_detectado" && !e.dataConfirmacao ? (
+                          <Circle size={20} color={C.cio} fill={C.cio} />
+                        ) : e.tipo === "cio_confirmado" || (e.tipo === "cio_detectado" && e.dataConfirmacao) ? (
+                          <CheckCircle size={20} color={C.pasto900} fill={C.pasto900} />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full" style={{ backgroundColor: C.pasto50 }} />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs px-2 py-1 rounded-md" style={{ ...fMono, backgroundColor: C.pasto50, color: C.pasto900 }}>
+                            {formatDate(e.data)}
+                          </span>
+                          <p className="text-sm font-medium" style={{ color: C.ink }}>
+                            {e.dataConfirmacao ? "🟢 Cio confirmado" : e.tipo === "cio_detectado" ? "🔴 Cio detectado" : TIPOS_REPRO.find((t) => t.v === e.tipo)?.l}
+                          </p>
+                        </div>
+
+                        {e.dataConfirmacao && (
+                          <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
+                            Confirmado em {formatDate(e.dataConfirmacao)}
+                          </p>
+                        )}
+
+                        {(e.detalhe || e.resultado || e.previsaoParto) && (
+                          <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
+                            {e.resultado && (e.resultado === "prenhe" ? "✓ Prenhe confirmada" : "✗ Vazia")}
+                            {e.detalhe && e.detalhe}
+                            {e.previsaoParto && `Parto previsto: ${formatDate(e.previsaoParto)}`}
+                          </p>
+                        )}
+                      </div>
+
+                      <button onClick={() => remove(e.id)} className="p-1.5 rounded-md hover:bg-gray-100 shrink-0" title="Remover evento">
+                        <Trash2 size={16} color={C.cio} />
+                      </button>
+                    </div>
+
+                    {/* Ações rápidas */}
+                    {e.tipo === "cio_detectado" && !e.dataConfirmacao && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => confirmarCio(e.id)}
+                          disabled={salvando}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                          style={{ backgroundColor: C.pasto900, opacity: salvando ? 0.6 : 1 }}
+                        >
+                          {salvando ? "Confirmando…" : "✓ Confirmar Cio"}
+                        </button>
+                      </div>
+                    )}
+
+                    {(e.tipo === "cio_detectado" && e.dataConfirmacao) || e.tipo === "cio_confirmado" ? (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => abrirRegistroReproducao(e.id, animal.id)}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold text-white"
+                          style={{ backgroundColor: C.cio }}
+                        >
+                          + Registrar reprodução
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-              <button onClick={() => remove(e.id)} className="p-1.5 rounded-md hover:bg-gray-100"><Trash2 size={16} color={C.cio} /></button>
             </div>
           ))}
         </div>

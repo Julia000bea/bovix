@@ -22,11 +22,23 @@ export const CATEGORIAS = ["Bezerra", "Novilha", "Vaca lactante", "Vaca seca"];
 export const STATUS_ANIMAL = ["Ativa", "Vendida", "Morta"];
 export const CATEGORIAS_GASTO = ["Ração", "Insumos", "Medicamentos", "Mão de obra", "Manutenção", "Outros"];
 export const TIPOS_REPRO = [
-  { v: "cio", l: "Cio observado" },
-  { v: "inseminacao", l: "Inseminação" },
-  { v: "diagnostico", l: "Diagnóstico de gestação" },
-  { v: "parto", l: "Parto" },
+  { v: "cio_detectado", l: "Cio detectado" },
+  { v: "cio_confirmado", l: "Cio confirmado" },
+  { v: "inseminacao", l: "Inseminação / Serviço" },
+  { v: "diagnostico_prenhez", l: "Diagnóstico de prenhez" },
+  { v: "prenhez_confirmada", l: "Prenhez confirmada" },
   { v: "secagem", l: "Secagem" },
+  { v: "pre_parto", l: "Pré-parto" },
+  { v: "parto", l: "Parto" },
+];
+
+export const STATUS_REPRODUCAO = [
+  "No cio",
+  "Cio confirmado",
+  "Reproduzida",
+  "Prenhe",
+  "Seca",
+  "Vaca lactante",
 ];
 export const TIPOS_SAUDE = [
   { v: "vacina", l: "Vacina" },

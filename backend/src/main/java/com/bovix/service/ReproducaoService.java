@@ -7,6 +7,7 @@ import com.bovix.repository.EventoReproducaoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -38,6 +39,19 @@ public class ReproducaoService {
         }
 
         return repository.save(dados);
+    }
+
+    public EventoReproducao confirmarCio(Long eventoId) {
+        EventoReproducao evento = repository.findById(eventoId)
+                .orElseThrow(() -> new IllegalArgumentException("Evento não encontrado: " + eventoId));
+        animalService.verificarPropriedade(evento.getAnimal());
+
+        if (!"cio_detectado".equals(evento.getTipo())) {
+            throw new IllegalArgumentException("Apenas eventos de cio detectado podem ser confirmados");
+        }
+
+        evento.setDataConfirmacao(LocalDate.now());
+        return repository.save(evento);
     }
 
     public void remover(Long id) {
