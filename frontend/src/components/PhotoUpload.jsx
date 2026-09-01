@@ -63,7 +63,6 @@ export default function PhotoUpload({ animalId, fotoUrl, onUploaded, onSelectFil
         )}
       </button>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={aoSelecionar} />
-      {!src && <span className="text-xs" style={{ color: C.inkSoft }}>Toque para adicionar foto</span>}
     </div>
   );
 }

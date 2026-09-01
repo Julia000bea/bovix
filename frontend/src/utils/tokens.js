@@ -24,7 +24,8 @@ export const CATEGORIAS_GASTO = ["Ração", "Insumos", "Medicamentos", "Mão de 
 export const TIPOS_REPRO = [
   { v: "cio_detectado", l: "Cio detectado" },
   { v: "cio_confirmado", l: "Cio confirmado" },
-  { v: "inseminacao", l: "Inseminação / Serviço" },
+  { v: "reproducao", l: "Reprodução (Touro)" },
+  { v: "inseminacao", l: "Inseminação" },
   { v: "diagnostico_prenhez", l: "Diagnóstico de prenhez" },
   { v: "prenhez_confirmada", l: "Prenhez confirmada" },
   { v: "secagem", l: "Secagem" },
