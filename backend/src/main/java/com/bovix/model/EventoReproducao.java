@@ -50,6 +50,18 @@ public class EventoReproducao {
     @PrePersist
     void prePersist() {
         if (criadoEm == null) criadoEm = LocalDateTime.now();
+        normalizarResultado();
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        normalizarResultado();
+    }
+
+    private void normalizarResultado() {
+        if (resultado != null && resultado.isBlank()) {
+            resultado = null;
+        }
     }
 
     @Transient
