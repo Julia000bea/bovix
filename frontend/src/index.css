@@ -8,3 +8,8 @@ body {
   margin: 0;
   font-family: 'Inter', sans-serif;
 }
+
+/* Esconde cursor piscante em textos não editáveis */
+h1, h2, h3, h4, h5, h6, p, span, div:not(input):not(textarea) {
+  caret-color: transparent;
+}

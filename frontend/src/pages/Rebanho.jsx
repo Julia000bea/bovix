@@ -97,8 +97,8 @@ export default function Rebanho({ data }) {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span style={fMono} className="text-xs font-semibold" >#{a.brinco}</span>
-                  <span className="font-semibold text-sm" style={{ color: C.ink }}>{a.nome || "Sem nome"}</span>
+                  <span style={fMono} className="text-lg font-semibold" >#{a.brinco}</span>
+                  <span className="font-semibold text-xs" style={{ color: C.ink }}>{a.nome || "Sem nome"}</span>
                   <Pill color={C.leite}>{a.categoria}</Pill>
                   {a.status !== "Ativa" && <Pill color={C.terra}>{a.status}</Pill>}
                 </div>

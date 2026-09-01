@@ -51,7 +51,7 @@ export default function Login({ auth }) {
               </Field>
             )}
             <Field label="E-mail">
-              <input required type="email" className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <input required type="email" className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="off" />
             </Field>
             <Field label="Senha">
               <input required type="password" minLength={6} className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} />
