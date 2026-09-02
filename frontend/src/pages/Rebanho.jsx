@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Field, Pill, EmptyState, inputCls, inputStyle } from "../components/ui";
 import PhotoUpload from "../components/PhotoUpload";
-import { C, CATEGORIAS, STATUS_ANIMAL, fMono } from "../utils/tokens";
+import { C, CATEGORIAS, STATUS_ANIMAL, TIPOS_REPRO, TIPOS_SAUDE, fMono } from "../utils/tokens";
 import { formatDate } from "../utils/date";
 import { novoAnimal } from "../models/Animal";
 import { animaisService } from "../services/animaisService";
 
 export default function Rebanho({ data }) {
-  const { animais, setAnimais } = data;
+  const { animais, setAnimais, reproducao, saude } = data;
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [form, setForm] = useState(novoAnimal());
@@ -16,9 +16,29 @@ export default function Rebanho({ data }) {
   const [salvando, setSalvando] = useState(false);
   const [animalSelecionado, setAnimalSelecionado] = useState(null);
   const [formEdicao, setFormEdicao] = useState({});
+  const camposCadastroRef = useRef([]);
+
+  const focarBrinco = () => {
+    requestAnimationFrame(() => camposCadastroRef.current[0]?.focus());
+  };
+
+  useEffect(() => {
+    if (open) focarBrinco();
+  }, [open]);
+
+  const avancarCampo = (event, proximoCampo) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+
+    if (proximoCampo === null) {
+      addAnimal();
+      return;
+    }
+    camposCadastroRef.current[proximoCampo]?.focus();
+  };
 
   const addAnimal = async () => {
-    if (!form.brinco) return;
+    if (!form.brinco || salvando) return;
     setSalvando(true);
     try {
       let criado = await animaisService.criar(form);
@@ -28,7 +48,7 @@ export default function Rebanho({ data }) {
       setAnimais((prev) => [...prev, criado]);
       setForm(novoAnimal());
       setFotoPendente(null);
-      setOpen(false);
+      focarBrinco();
     } finally {
       setSalvando(false);
     }
@@ -70,6 +90,34 @@ export default function Rebanho({ data }) {
     (a) => a.brinco.toLowerCase().includes(q.toLowerCase()) || (a.nome || "").toLowerCase().includes(q.toLowerCase())
   );
 
+  const historicoAnimal = animalSelecionado
+    ? [
+        ...reproducao
+          .filter((evento) => Number(evento.animalId) === animalSelecionado.id)
+          .map((evento) => ({
+            ...evento,
+            origem: "reproducao",
+            titulo: TIPOS_REPRO.find((tipo) => tipo.v === evento.tipo)?.l || evento.tipo,
+            detalhe: [
+              evento.resultado === "prenhe" ? "Prenhe" : evento.resultado === "vazia" ? "Vazia" : evento.resultado,
+              evento.detalhe,
+              evento.previsaoParto && `Parto previsto: ${formatDate(evento.previsaoParto)}`,
+            ].filter(Boolean).join(" · "),
+          })),
+        ...saude
+          .filter((evento) => Number(evento.animalId) === animalSelecionado.id)
+          .map((evento) => ({
+            ...evento,
+            origem: "saude",
+            titulo: `${TIPOS_SAUDE.find((tipo) => tipo.v === evento.tipo)?.l || "Saúde"}: ${evento.produto}`,
+            detalhe: [
+              evento.carenciaLeiteDias && `Carência: ${evento.carenciaLeiteDias} dias`,
+              evento.observacoes,
+            ].filter(Boolean).join(" · "),
+          })),
+      ].sort((a, b) => new Date(b.data) - new Date(a.data))
+    : [];
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
@@ -86,16 +134,22 @@ export default function Rebanho({ data }) {
         <div className="rounded-xl border bg-white p-4 flex flex-col gap-3" style={{ borderColor: C.line }}>
           <PhotoUpload animalId={null} fotoUrl={null} onSelectFile={setFotoPendente} />
           <div className="grid sm:grid-cols-3 gap-3">
-            <Field label="Brinco (nº) *"><input className={inputCls} style={inputStyle} value={form.brinco} onChange={(e) => setForm({ ...form, brinco: e.target.value })} /></Field>
-            <Field label="Nome"><input className={inputCls} style={inputStyle} value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Field>
-            <Field label="Raça"><input className={inputCls} style={inputStyle} value={form.raca} onChange={(e) => setForm({ ...form, raca: e.target.value })} /></Field>
-            <Field label="Nascimento"><input type="date" className={inputCls} style={inputStyle} value={form.nascimento} onChange={(e) => setForm({ ...form, nascimento: e.target.value })} /></Field>
+            <Field label="Brinco (nº) *"><input ref={(el) => { camposCadastroRef.current[0] = el; }} className={inputCls} style={inputStyle} value={form.brinco} onChange={(e) => setForm({ ...form, brinco: e.target.value })} onKeyDown={(e) => avancarCampo(e, 1)} /></Field>
+            <Field label="Nome"><input ref={(el) => { camposCadastroRef.current[1] = el; }} className={inputCls} style={inputStyle} value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} onKeyDown={(e) => avancarCampo(e, 2)} /></Field>
+            <Field label="Raça">
+              <select ref={(el) => { camposCadastroRef.current[2] = el; }} className={inputCls} style={inputStyle} value={form.raca} onChange={(e) => setForm({ ...form, raca: e.target.value })} onKeyDown={(e) => avancarCampo(e, 3)}>
+                <option value="">Não informado</option>
+                <option value="Holandês">Holandês</option>
+                <option value="Jersey">Jersey</option>
+              </select>
+            </Field>
+            <Field label="Nascimento"><input ref={(el) => { camposCadastroRef.current[3] = el; }} type="date" className={inputCls} style={inputStyle} value={form.nascimento} onChange={(e) => setForm({ ...form, nascimento: e.target.value })} onKeyDown={(e) => avancarCampo(e, 4)} /></Field>
             <Field label="Categoria">
-              <select className={inputCls} style={inputStyle} value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+              <select ref={(el) => { camposCadastroRef.current[4] = el; }} className={inputCls} style={inputStyle} value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} onKeyDown={(e) => avancarCampo(e, 5)}>
                 {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Notas"><input className={inputCls} style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} /></Field>
+            <Field label="Notas"><input ref={(el) => { camposCadastroRef.current[5] = el; }} className={inputCls} style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} onKeyDown={(e) => avancarCampo(e, null)} /></Field>
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
@@ -160,6 +214,32 @@ export default function Rebanho({ data }) {
                 size={72}
                 onUploaded={(atualizado) => setFormEdicao({ ...formEdicao, fotoUrl: atualizado.fotoUrl })}
               />
+
+              <section className="rounded-xl border p-3" style={{ borderColor: C.line, backgroundColor: C.pasto50 }}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Histórico do animal</h3>
+                  <span className="text-xs" style={{ ...fMono, color: C.inkSoft }}>#{animalSelecionado.brinco}</span>
+                </div>
+                {historicoAnimal.length === 0 ? (
+                  <p className="text-xs" style={{ color: C.inkSoft }}>Nenhum evento de reprodução ou saúde registrado.</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-1">
+                    {historicoAnimal.map((evento) => (
+                      <div key={`${evento.origem}-${evento.id}`} className="rounded-lg bg-white px-2.5 py-2 border" style={{ borderColor: C.line }}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] rounded px-1.5 py-0.5 shrink-0" style={{ ...fMono, backgroundColor: evento.origem === "reproducao" ? C.cio + "22" : C.leite + "22", color: evento.origem === "reproducao" ? C.cio : C.leite }}>
+                            {evento.origem === "reproducao" ? "REPRODUÇÃO" : "SAÚDE"}
+                          </span>
+                          <span className="text-xs" style={{ ...fMono, color: C.inkSoft }}>{formatDate(evento.data)}</span>
+                        </div>
+                        <p className="text-xs font-medium mt-1" style={{ color: C.ink }}>{evento.titulo}</p>
+                        {evento.detalhe && <p className="text-xs mt-0.5" style={{ color: C.inkSoft }}>{evento.detalhe}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
               <Field label="Brinco (nº) *">
                 <input className={inputCls} style={inputStyle} value={formEdicao.brinco || ""} onChange={(e) => setFormEdicao({ ...formEdicao, brinco: e.target.value })} />
               </Field>
