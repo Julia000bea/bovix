@@ -21,7 +21,9 @@ export function useAlerts({ animais, reproducao, saude, config }) {
 
       if (last?.tipo === "inseminacao") {
         const negDepois = repro.some(
-          (e) => e.tipo === "diagnostico" && e.resultado === "negativo" && e.data > last.data
+          (e) => ["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
+            && ["negativo", "vazia"].includes(e.resultado)
+            && e.data > last.data
         );
         const partoDepois = repro.some((e) => e.tipo === "parto" && e.data > last.data);
 
@@ -41,7 +43,8 @@ export function useAlerts({ animais, reproducao, saude, config }) {
             });
           }
         } else if (negDepois) {
-          const cioBase = repro.find((e) => e.tipo === "diagnostico" && e.resultado === "negativo");
+          const cioBase = repro.find((e) => ["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
+            && ["negativo", "vazia"].includes(e.resultado));
           const proximoCio = addDays(cioBase.data, cioDias);
           const dias = daysBetween(today, proximoCio);
           if (dias >= -3 && dias <= 3) {

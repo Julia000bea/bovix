@@ -61,8 +61,8 @@ public class PainelDoDiaService {
             EventoReproducao ultimo = repro.isEmpty() ? null : repro.get(0);
 
             if (ultimo != null && "inseminacao".equals(ultimo.getTipo())) {
-                boolean negDepois = repro.stream().anyMatch(e -> "diagnostico".equals(e.getTipo())
-                        && "negativo".equals(e.getResultado()) && e.getData().isAfter(ultimo.getData()));
+                boolean negDepois = repro.stream().anyMatch(e -> ehDiagnosticoNegativo(e)
+                        && e.getData().isAfter(ultimo.getData()));
                 boolean partoDepois = repro.stream().anyMatch(e -> "parto".equals(e.getTipo())
                         && e.getData().isAfter(ultimo.getData()));
 
@@ -75,7 +75,7 @@ public class PainelDoDiaService {
                     }
                 } else if (negDepois) {
                     EventoReproducao cioBase = repro.stream()
-                            .filter(e -> "diagnostico".equals(e.getTipo()) && "negativo".equals(e.getResultado()))
+                            .filter(this::ehDiagnosticoNegativo)
                             .findFirst().orElse(null);
                     if (cioBase != null) {
                         LocalDate proximoCio = cioBase.getData().plusDays(cioDias);
@@ -133,6 +133,11 @@ public class PainelDoDiaService {
         if (dias < 0) return "atrasado";
         if (dias <= 7) return "urgente";
         return "proximo";
+    }
+
+    private boolean ehDiagnosticoNegativo(EventoReproducao evento) {
+        return ("diagnostico".equals(evento.getTipo()) || "diagnostico_prenhez".equals(evento.getTipo()))
+                && ("negativo".equals(evento.getResultado()) || "vazia".equals(evento.getResultado()));
     }
 
     private String textoParto(long dias, LocalDate previsao) {

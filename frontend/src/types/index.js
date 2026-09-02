@@ -21,10 +21,10 @@
  * @typedef {Object} EventoReproducao
  * @property {number} id
  * @property {number} animalId
- * @property {'cio'|'inseminacao'|'diagnostico'|'parto'|'secagem'} tipo
+ * @property {'cio_detectado'|'cio_confirmado'|'inseminacao'|'reproducao'|'diagnostico_prenhez'|'prenhez_confirmada'|'secagem'|'pre_parto'|'parto'} tipo
  * @property {string} data              - 'YYYY-MM-DD'
  * @property {string} [detalhe]
- * @property {'positivo'|'negativo'} [resultado]
+ * @property {'prenhe'|'vazia'} [resultado]
  */
 
 /**

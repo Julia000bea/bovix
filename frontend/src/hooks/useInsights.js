@@ -90,7 +90,8 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
       const ultimaInsem = repro.find((e) => e.tipo === "inseminacao");
       if (!ultimaInsem) continue;
       const temEventoDepois = repro.some(
-        (e) => (e.tipo === "parto" || (e.tipo === "diagnostico" && e.resultado === "negativo")) && e.data > ultimaInsem.data
+        (e) => (e.tipo === "parto" || (["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
+          && ["negativo", "vazia"].includes(e.resultado))) && e.data > ultimaInsem.data
       );
       if (temEventoDepois) continue;
       const diasGestante = daysBetween(ultimaInsem.data, today);
