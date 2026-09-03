@@ -3,13 +3,13 @@ import { Plus, Trash2, CheckCircle, Circle } from "lucide-react";
 import { Field, EmptyState, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, TIPOS_REPRO, fMono } from "../utils/tokens";
-import { formatDate, todayStr } from "../utils/date";
+import { addDays, formatDate, todayStr } from "../utils/date";
 import { novoEventoReproducao } from "../models/EventoReproducao";
 import { rotuloAnimal } from "../models/Animal";
 import { reproducaoService } from "../services/reproducaoService";
 
 export default function Reproducao({ data }) {
-  const { animais, setAnimais, reproducao, setReproducao } = data;
+  const { animais, setAnimais, reproducao, setReproducao, config } = data;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(novoEventoReproducao());
   const [salvando, setSalvando] = useState(false);
@@ -26,6 +26,8 @@ export default function Reproducao({ data }) {
       semenCodigo: "", // Código/nome do sêmen
     },
   });
+  const gestacaoDias = Number(config?.gestacaoDias) || 283;
+  const preverParto = (dataBase) => (dataBase ? addDays(dataBase, gestacaoDias) : null);
 
   const add = async () => {
     if (!form.animalId || !form.tipo) return;
@@ -186,6 +188,8 @@ export default function Reproducao({ data }) {
             </Field>
           )}
 
+          {["inseminacao", "reproducao"].includes(form.tipo) && <PrevisaoParto data={preverParto(form.data)} dias={gestacaoDias} />}
+
           {form.tipo === "diagnostico_prenhez" && (
             <Field label="Resultado do diagnóstico">
               <select className={inputCls} style={inputStyle} value={form.resultado} onChange={(e) => setForm({ ...form, resultado: e.target.value })}>
@@ -327,6 +331,8 @@ export default function Reproducao({ data }) {
             </Field>
 
             {/* Campos específicos para Touro */}
+            <PrevisaoParto data={preverParto(modalReproducao.formReproducao.dataReproducao)} dias={gestacaoDias} />
+
             {modalReproducao.tipoReproducao === "touro" && (
               <>
                 <Field label="Touro utilizado *">
@@ -490,6 +496,16 @@ export default function Reproducao({ data }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function PrevisaoParto({ data, dias }) {
+  if (!data) return null;
+
+  return (
+    <div className="rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: C.pasto50, color: C.pasto900 }}>
+      Parto previsto: <strong>{formatDate(data)}</strong> <span className="text-xs">({dias} dias de gestacao)</span>
     </div>
   );
 }

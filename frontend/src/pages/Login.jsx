@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Milk, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { C, fDisplay, fBody } from "../utils/tokens";
 import { Field, inputCls, inputStyle } from "../components/ui";
+import BrandLogo from "../components/BrandLogo";
 
 export default function Login({ auth }) {
   const [modo, setModo] = useState("login"); // login | registro
@@ -23,8 +24,8 @@ export default function Login({ auth }) {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: C.pasto50, ...fBody }}>
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-6">
-          <Milk size={28} color={C.pasto900} />
-          <div className="text-center">
+          <BrandLogo />
+          <div className="text-center hidden">
             <h1 style={{ ...fDisplay, color: C.pasto900, fontWeight: 700 }} className="text-2xl leading-tight">Bovix</h1>
             <p style={{ color: C.inkSoft }} className="text-xs">Gestão Inteligente do Rebanho</p>
           </div>
