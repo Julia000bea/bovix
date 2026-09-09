@@ -1,4 +1,4 @@
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Milk } from "lucide-react";
 import { C, fDisplay, fMono } from "../utils/tokens";
 import { formatDate, todayStr } from "../utils/date";
 import BrandLogo from "./BrandLogo";
