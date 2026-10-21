@@ -12,8 +12,10 @@ import java.time.LocalDateTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Animal {
 
+    // Somente leitura no JSON: um id vindo do cliente faria o save() virar UPDATE de outro registro.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -43,7 +45,9 @@ public class Animal {
     @Column(columnDefinition = "TEXT")
     private String notas;
 
+    // Definida só pelo upload (AnimalService.salvarFoto), nunca pelo JSON do cliente.
     @Column(name = "foto_url", length = 500)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String fotoUrl;
 
     @Column(name = "criado_em", updatable = false)

@@ -13,8 +13,10 @@ import java.time.LocalTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Configuracao {
 
+    // Somente leitura no JSON: um id vindo do cliente faria o save() virar UPDATE de outro registro.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
