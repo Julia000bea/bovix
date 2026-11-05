@@ -3,7 +3,9 @@ import { Camera, Loader2 } from "lucide-react";
 import { C } from "../utils/tokens";
 import { animaisService } from "../services/animaisService";
 
-const API_ORIGIN = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/api\/?$/, "");
+// mesmos formatos aceitos pelo backend (AnimalService.salvarFoto)
+const TIPOS_ACEITOS = ["image/jpeg", "image/png", "image/webp"];
+const API_ORIGIN =(import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/api\/?$/, "");
 
 /**
  * Foto de perfil do animal. Se o animal já existe (animalId), envia o arquivo
@@ -20,7 +22,12 @@ export default function PhotoUpload({ animalId, fotoUrl, onUploaded, onSelectFil
 
   const aoSelecionar = async (e) => {
     const arquivo = e.target.files?.[0];
+    e.target.value = ""; // permite escolher o mesmo arquivo de novo após um erro
     if (!arquivo) return;
+    if (!TIPOS_ACEITOS.includes(arquivo.type)) {
+      window.alert("Envie uma imagem JPG, PNG ou WEBP.");
+      return;
+    }
 
     setPreview(URL.createObjectURL(arquivo));
 
@@ -35,6 +42,8 @@ export default function PhotoUpload({ animalId, fotoUrl, onUploaded, onSelectFil
       onUploaded?.(animalAtualizado);
     } catch (err) {
       console.error("Falha ao enviar foto:", err);
+      setPreview(fotoUrl || null); // não mostrar como salva uma foto que não foi enviada
+      window.alert(`Não foi possível enviar a foto: ${err.message}`);
     } finally {
       setEnviando(false);
     }
@@ -62,7 +71,7 @@ export default function PhotoUpload({ animalId, fotoUrl, onUploaded, onSelectFil
           </span>
         )}
       </button>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={aoSelecionar} />
+      <input ref={inputRef} type="file" accept={TIPOS_ACEITOS.join(",")} className="hidden" onChange={aoSelecionar} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ package com.bovix.controller;
 
 import com.bovix.model.Animal;
 import com.bovix.service.AnimalService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,12 +29,12 @@ public class AnimalController {
     }
 
     @PostMapping("/fazendas/{fazendaId}/animais")
-    public ResponseEntity<Animal> criar(@PathVariable Long fazendaId, @RequestBody Animal dados) {
+    public ResponseEntity<Animal> criar(@PathVariable Long fazendaId, @Valid @RequestBody Animal dados) {
         return ResponseEntity.ok(animalService.criar(fazendaId, dados));
     }
 
     @PutMapping("/animais/{id}")
-    public Animal atualizar(@PathVariable Long id, @RequestBody Animal dados) {
+    public Animal atualizar(@PathVariable Long id, @Valid @RequestBody Animal dados) {
         return animalService.atualizar(id, dados);
     }
 

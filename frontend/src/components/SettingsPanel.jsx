@@ -23,7 +23,7 @@ export default function SettingsPanel({ config, setConfig, onClose }) {
         gestacaoDias: Number(gestacao) || 283,
         cioDias: Number(cio) || 21,
         notificacaoAtiva,
-        notificacaoEmail: notificacaoEmail || null,
+        notificacaoEmail: notificacaoEmail.trim(), // "" remove o e-mail cadastrado
         notificacaoHorario: notificacaoHorario ? `${notificacaoHorario}:00` : null,
       });
       setConfig(atualizado);
@@ -94,7 +94,9 @@ export default function SettingsPanel({ config, setConfig, onClose }) {
       <div className="flex flex-wrap justify-between items-center gap-2">
         <button
           onClick={testarAgora}
-          disabled={testando || !notificacaoEmail}
+          // o teste usa o e-mail salvo no servidor: com alteração pendente, salve antes
+          disabled={testando || !notificacaoEmail || notificacaoEmail.trim() !== (config.notificacaoEmail || "")}
+          title={notificacaoEmail.trim() !== (config.notificacaoEmail || "") ? "Salve o e-mail antes de testar" : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg font-semibold disabled:opacity-40"
           style={{ backgroundColor: "#ffffff18", color: "#DCE5D6" }}
         >

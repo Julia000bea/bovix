@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Wallet, Trash2 } from "lucide-react";
-import { Field, Pill, EmptyState, inputCls, inputStyle } from "../components/ui";
+import { Field, Pill, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import { C, CATEGORIAS_GASTO, fMono } from "../utils/tokens";
 import { formatDate, todayStr } from "../utils/date";
 import { brl } from "../utils/format";
@@ -18,23 +18,33 @@ export default function Financeiro({ data }) {
   const [mesRef, setMesRef] = useState(todayStr().slice(0, 7));
   const [form, setForm] = useState(novoGasto());
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
 
   const add = async () => {
     if (!form.valor) return;
     setSalvando(true);
+    setErro("");
     try {
       const criado = await financeiroService.criar(form);
       setFinanceiro((prev) => [...prev, criado]);
       setForm(novoGasto());
       setOpen(false);
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar o gasto.");
     } finally {
       setSalvando(false);
     }
   };
 
   const remove = async (id) => {
-    await financeiroService.remover(id);
-    setFinanceiro((prev) => prev.filter((e) => e.id !== id));
+    if (!window.confirm("Remover este lançamento?")) return;
+    setErro("");
+    try {
+      await financeiroService.remover(id);
+      setFinanceiro((prev) => prev.filter((e) => e.id !== id));
+    } catch (e) {
+      setErro(e.message || "Não foi possível remover o lançamento.");
+    }
   };
 
   const gastosDoMes = financeiro.filter((g) => g.data.slice(0, 7) === mesRef);
@@ -47,6 +57,7 @@ export default function Financeiro({ data }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <ErrorText text={erro} />
       <div className="rounded-xl border bg-white p-4" style={{ borderColor: C.line }}>
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
           <div className="flex items-center gap-2">

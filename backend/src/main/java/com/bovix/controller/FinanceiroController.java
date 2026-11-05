@@ -2,6 +2,7 @@ package com.bovix.controller;
 
 import com.bovix.model.Financeiro;
 import com.bovix.service.FinanceiroService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class FinanceiroController {
     }
 
     @PostMapping("/fazendas/{fazendaId}/financeiro")
-    public ResponseEntity<Financeiro> criar(@PathVariable Long fazendaId, @RequestBody Financeiro dados) {
+    public ResponseEntity<Financeiro> criar(@PathVariable Long fazendaId, @Valid @RequestBody Financeiro dados) {
         return ResponseEntity.ok(service.criar(fazendaId, dados));
     }
 

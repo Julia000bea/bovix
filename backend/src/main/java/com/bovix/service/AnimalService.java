@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,6 +23,11 @@ public class AnimalService {
 
     private final AnimalRepository animalRepository;
     private final FazendaService fazendaService;
+
+    private static final Map<String, String> EXTENSAO_POR_TIPO = Map.of(
+            "image/jpeg", ".jpg",
+            "image/png", ".png",
+            "image/webp", ".webp");
 
     @Value("${bovix.uploads-dir}")
     private String uploadsDir;
@@ -64,10 +71,15 @@ public class AnimalService {
     public Animal salvarFoto(Long id, MultipartFile arquivo) throws IOException {
         Animal animal = buscar(id); // já valida propriedade
 
+        // extensão vem do tipo validado, nunca do nome enviado — evita hospedar .html/.svg com script
+        String extensao = arquivo.isEmpty() ? null : EXTENSAO_POR_TIPO.get(arquivo.getContentType());
+        if (extensao == null || !assinaturaDeImagem(arquivo)) {
+            throw new RegraNegocioException("Envie uma imagem JPG, PNG ou WEBP.");
+        }
+
         Path pasta = Paths.get(uploadsDir);
         Files.createDirectories(pasta);
 
-        String extensao = obterExtensao(arquivo.getOriginalFilename());
         String nomeArquivo = UUID.randomUUID() + extensao;
         Path destino = pasta.resolve(nomeArquivo);
         Files.copy(arquivo.getInputStream(), destino, StandardCopyOption.REPLACE_EXISTING);
@@ -86,8 +98,16 @@ public class AnimalService {
         }
     }
 
-    private String obterExtensao(String nomeOriginal) {
-        if (nomeOriginal == null || !nomeOriginal.contains(".")) return "";
-        return nomeOriginal.substring(nomeOriginal.lastIndexOf("."));
+    /** Confere os primeiros bytes (JPEG, PNG ou WEBP) — o content-type sozinho é informado pelo cliente. */
+    private boolean assinaturaDeImagem(MultipartFile arquivo) throws IOException {
+        byte[] b = new byte[12];
+        int lidos;
+        try (InputStream in = arquivo.getInputStream()) {
+            lidos = in.readNBytes(b, 0, b.length);
+        }
+        if (lidos >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) return true; // JPEG
+        if (lidos >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') return true;      // PNG
+        return lidos >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P';                                   // WEBP
     }
 }

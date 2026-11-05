@@ -2,6 +2,7 @@ package com.bovix.controller;
 
 import com.bovix.model.Ordenha;
 import com.bovix.service.OrdenhaService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class OrdenhaController {
     public ResponseEntity<Ordenha> criar(
             @PathVariable Long fazendaId,
             @RequestParam(required = false) Long animalId,
-            @RequestBody Ordenha dados) {
+            @Valid @RequestBody Ordenha dados) {
         return ResponseEntity.ok(service.criar(fazendaId, animalId, dados));
     }
 

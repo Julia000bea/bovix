@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Syringe, Trash2 } from "lucide-react";
-import { Field, EmptyState, inputCls, inputStyle } from "../components/ui";
+import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, TIPOS_SAUDE, fMono } from "../utils/tokens";
 import { formatDate } from "../utils/date";
@@ -13,29 +13,40 @@ export default function Saude({ data }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(novoEventoSaude());
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
 
   const add = async () => {
     if (!form.animalId || !form.produto) return;
     setSalvando(true);
+    setErro("");
     try {
       const criado = await saudeService.criar(form.animalId, form);
       setSaude((prev) => [...prev, criado]);
       setForm(novoEventoSaude());
       setOpen(false);
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar o registro.");
     } finally {
       setSalvando(false);
     }
   };
 
   const remove = async (id) => {
-    await saudeService.remover(id);
-    setSaude((prev) => prev.filter((e) => e.id !== id));
+    if (!window.confirm("Remover este registro de saúde?")) return;
+    setErro("");
+    try {
+      await saudeService.remover(id);
+      setSaude((prev) => prev.filter((e) => e.id !== id));
+    } catch (e) {
+      setErro(e.message || "Não foi possível remover o registro.");
+    }
   };
 
   const eventos = [...saude].sort((a, b) => (a.data < b.data ? 1 : -1));
 
   return (
     <div className="flex flex-col gap-4">
+      <ErrorText text={erro} />
       <div className="flex justify-end">
         <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.leite, color: "#fff" }}>
           <Plus size={16} /> Novo registro
@@ -53,7 +64,7 @@ export default function Saude({ data }) {
           <Field label="Produto / medicamento *"><input className={inputCls} style={inputStyle} value={form.produto} onChange={(e) => setForm({ ...form, produto: e.target.value })} /></Field>
           <Field label="Data da aplicação"><input type="date" className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
           <Field label="Carência do leite (dias)"><input type="number" min="0" className={inputCls} style={inputStyle} value={form.carenciaLeiteDias} onChange={(e) => setForm({ ...form, carenciaLeiteDias: e.target.value })} placeholder="ex: 4" /></Field>
-          <Field label="Repetir aplicação em (dias)"><input type="number" min="0" className={inputCls} style={inputStyle} value={form.proximaAplicacaoDias} onChange={(e) => setForm({ ...form, proximaAplicacaoDias: e.target.value })} placeholder="ex: 365 (anual)" /></Field>
+          <Field label="Repetir aplicação em (dias)"><input type="number" min="1" className={inputCls} style={inputStyle} value={form.proximaAplicacaoDias} onChange={(e) => setForm({ ...form, proximaAplicacaoDias: e.target.value })} placeholder="ex: 365 (anual)" /></Field>
           <div className="sm:col-span-2">
             <Field label="Observações"><input className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></Field>
           </div>

@@ -6,127 +6,241 @@ import com.bovix.model.Configuracao;
 import com.bovix.model.EventoReproducao;
 import com.bovix.model.EventoSaude;
 import com.bovix.repository.AnimalRepository;
+import com.bovix.repository.ConfiguracaoRepository;
 import com.bovix.repository.EventoReproducaoRepository;
 import com.bovix.repository.EventoSaudeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * Calcula o "Quadro do dia" no servidor — é o mesmo algoritmo do hook useAlerts.js do frontend
- * (previsão de parto/cio a partir do último evento reprodutivo, carência de leite, reaplicação
- * de vacina/medicamento). Precisa existir aqui também porque o relatório por e-mail roda sozinho,
- * sem ninguém com o navegador aberto.
+ * Calcula o "Quadro do dia": previsão de parto, secagem e pré-parto, diagnóstico de prenhez
+ * pendente, janelas de cio, carência do leite e reaplicação de vacina/medicamento.
+ * É a única implementação desses alertas: a tela consome GET /fazendas/{id}/alertas e o
+ * relatório por e-mail chama este mesmo service.
+ *
+ * Regra reprodutiva: depois do último parto, o evento de cio ou cobertura (inseminação/monta)
+ * mais recente define em que fase o animal está. Se for uma cobertura, os eventos posteriores
+ * (diagnóstico, prenhez confirmada, secagem, pré-parto) dizem se a gestação segue.
  */
 @Service
 @RequiredArgsConstructor
 public class PainelDoDiaService {
 
+    static final Set<String> TIPOS_COBERTURA = Set.of("inseminacao", "reproducao");
+    static final Set<String> TIPOS_CIO = Set.of("cio_detectado", "cio_confirmado");
+
+    private static final int GESTACAO_PADRAO = 283;
+    private static final int CIO_PADRAO = 21;
+    private static final int DIAS_SECAGEM_ANTES_DO_PARTO = 60;
+    private static final int DIAS_PRE_PARTO_ANTES_DO_PARTO = 21;
+    private static final int DIAS_PARA_DIAGNOSTICO = 30;
+
     private static final Map<String, Integer> ORDEM_URGENCIA = Map.of(
             "atrasado", 0, "urgente", 1, "ativo", 2, "proximo", 3
     );
 
+    private static final Comparator<EventoReproducao> MAIS_RECENTE_PRIMEIRO =
+            Comparator.comparing(EventoReproducao::getData)
+                    .thenComparing(EventoReproducao::getId, Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .reversed();
+
     private final AnimalRepository animalRepository;
     private final EventoReproducaoRepository reproducaoRepository;
     private final EventoSaudeRepository saudeRepository;
-    private final ConfiguracaoService configuracaoService;
+    private final ConfiguracaoRepository configuracaoRepository;
+    private final FazendaService fazendaService;
+    private final Clock clock;
 
+    /** Para requisições do usuário: valida que a fazenda é dele. */
     public List<AlertaDoDia> calcularAlertas(Long fazendaId) {
-        LocalDate hoje = LocalDate.now();
-        Configuracao config = configuracaoService.buscarOuCriar(fazendaId);
-        int gestacaoDias = config.getGestacaoDias() != null ? config.getGestacaoDias() : 283;
-        int cioDias = config.getCioDias() != null ? config.getCioDias() : 21;
+        fazendaService.verificarPropriedade(fazendaId);
+        return calcularAlertasDaFazenda(fazendaId);
+    }
+
+    /**
+     * Sem checagem de usuário — usado pelo agendador do e-mail diário, que roda fora de
+     * qualquer requisição autenticada. Não exponha em controller.
+     */
+    public List<AlertaDoDia> calcularAlertasDaFazenda(Long fazendaId) {
+        LocalDate hoje = LocalDate.now(clock);
+        Configuracao config = configuracaoRepository.findByFazenda_Id(fazendaId).orElse(null);
+        int gestacaoDias = config != null && config.getGestacaoDias() != null ? config.getGestacaoDias() : GESTACAO_PADRAO;
+        int cioDias = config != null && config.getCioDias() != null ? config.getCioDias() : CIO_PADRAO;
 
         List<Animal> ativos = animalRepository.findByFazenda_IdOrderByBrincoAsc(fazendaId).stream()
                 .filter(a -> "Ativa".equals(a.getStatus()))
                 .toList();
 
-        List<EventoReproducao> todaReproducao = reproducaoRepository.findByAnimal_Fazenda_IdOrderByDataDesc(fazendaId);
-        List<EventoSaude> todaSaude = saudeRepository.findByAnimal_Fazenda_IdOrderByDataDesc(fazendaId);
+        Map<Long, List<EventoReproducao>> reproPorAnimal = reproducaoRepository.findByAnimal_Fazenda_IdOrderByDataDesc(fazendaId)
+                .stream().collect(Collectors.groupingBy(EventoReproducao::getAnimalId));
+        Map<Long, List<EventoSaude>> saudePorAnimal = saudeRepository.findByAnimal_Fazenda_IdOrderByDataDesc(fazendaId)
+                .stream().collect(Collectors.groupingBy(EventoSaude::getAnimalId));
 
         List<AlertaDoDia> alertas = new ArrayList<>();
-
         for (Animal animal : ativos) {
-            List<EventoReproducao> repro = todaReproducao.stream()
-                    .filter(e -> animal.getId().equals(e.getAnimalId()))
-                    .sorted(Comparator.comparing(EventoReproducao::getData).reversed())
+            List<EventoReproducao> repro = reproPorAnimal.getOrDefault(animal.getId(), List.of()).stream()
+                    .sorted(MAIS_RECENTE_PRIMEIRO)
                     .toList();
+            alertasReprodutivos(animal, repro, hoje, gestacaoDias, cioDias, alertas);
+            alertasSaude(animal, saudePorAnimal.getOrDefault(animal.getId(), List.of()), hoje, alertas);
+        }
 
-            EventoReproducao ultimo = repro.isEmpty() ? null : repro.get(0);
+        alertas.sort(Comparator
+                .comparingInt((AlertaDoDia a) -> ORDEM_URGENCIA.getOrDefault(a.getUrgencia(), 9))
+                .thenComparing(AlertaDoDia::getDias, Comparator.nullsLast(Comparator.naturalOrder())));
+        return alertas;
+    }
 
-            if (ultimo != null && "inseminacao".equals(ultimo.getTipo())) {
-                boolean negDepois = repro.stream().anyMatch(e -> ehDiagnosticoNegativo(e)
-                        && e.getData().isAfter(ultimo.getData()));
-                boolean partoDepois = repro.stream().anyMatch(e -> "parto".equals(e.getTipo())
-                        && e.getData().isAfter(ultimo.getData()));
+    // ------------------------------------------------------------------ reprodução
 
-                if (!negDepois && !partoDepois) {
-                    LocalDate previsao = ultimo.getData().plusDays(gestacaoDias);
-                    long dias = ChronoUnit.DAYS.between(hoje, previsao);
-                    if (dias <= 15 && dias >= -10) {
-                        alertas.add(new AlertaDoDia(animal.getBrinco(), animal.getNome(),
-                                urgenciaParto(dias), textoParto(dias, previsao)));
-                    }
-                } else if (negDepois) {
-                    EventoReproducao cioBase = repro.stream()
-                            .filter(this::ehDiagnosticoNegativo)
-                            .findFirst().orElse(null);
-                    if (cioBase != null) {
-                        LocalDate proximoCio = cioBase.getData().plusDays(cioDias);
-                        long dias = ChronoUnit.DAYS.between(hoje, proximoCio);
-                        if (dias >= -3 && dias <= 3) {
-                            alertas.add(new AlertaDoDia(animal.getBrinco(), animal.getNome(),
-                                    dias <= 0 ? "urgente" : "proximo",
-                                    "Possível retorno de cio (diagnóstico negativo) — janela " + formatar(proximoCio)));
-                        }
-                    }
+    private void alertasReprodutivos(Animal animal, List<EventoReproducao> eventos, LocalDate hoje,
+                                     int gestacaoDias, int cioDias, List<AlertaDoDia> alertas) {
+        LocalDate ultimoParto = eventos.stream()
+                .filter(e -> "parto".equals(e.getTipo()))
+                .map(EventoReproducao::getData)
+                .findFirst().orElse(null);
+
+        List<EventoReproducao> ciclo = eventos.stream()
+                .filter(e -> ultimoParto == null || e.getData().isAfter(ultimoParto))
+                .toList();
+
+        EventoReproducao marco = ciclo.stream()
+                .filter(e -> TIPOS_CIO.contains(e.getTipo()) || TIPOS_COBERTURA.contains(e.getTipo()))
+                .findFirst().orElse(null);
+        if (marco == null) return;
+
+        if (TIPOS_CIO.contains(marco.getTipo())) {
+            LocalDate proximoCio = marco.getData().plusDays(cioDias);
+            alertaJanelaCio(animal, "cio", proximoCio, hoje, "Janela de cio prevista — " + formatar(proximoCio), alertas);
+            return;
+        }
+
+        EventoReproducao cobertura = marco;
+        List<EventoReproducao> posCobertura = ciclo.subList(0, ciclo.indexOf(cobertura));
+
+        // diagnóstico mais recente com resultado (ou prenhez confirmada) decide se a gestação segue
+        EventoReproducao ultimoResultado = posCobertura.stream()
+                .filter(e -> "prenhez_confirmada".equals(e.getTipo())
+                        || ("diagnostico_prenhez".equals(e.getTipo()) && e.getResultado() != null))
+                .findFirst().orElse(null);
+
+        if (ultimoResultado != null && "vazia".equals(ultimoResultado.getResultado())) {
+            LocalDate proximoCio = ultimoResultado.getData().plusDays(cioDias);
+            alertaJanelaCio(animal, "retorno", proximoCio, hoje,
+                    "Possível retorno de cio (diagnóstico: vazia) — janela " + formatar(proximoCio), alertas);
+            return;
+        }
+        boolean confirmada = ultimoResultado != null;
+
+        LocalDate previsao = previsaoParto(cobertura, posCobertura, gestacaoDias);
+        long diasParto = ChronoUnit.DAYS.between(hoje, previsao);
+        if (diasParto <= 15 && diasParto >= -10) {
+            alertas.add(alerta("parto-" + animal.getId(), animal, "parto", urgenciaParto(diasParto), diasParto,
+                    textoParto(diasParto, previsao)));
+        }
+
+        if (confirmada) {
+            boolean secou = posCobertura.stream().anyMatch(e -> "secagem".equals(e.getTipo()) || "pre_parto".equals(e.getTipo()));
+            if (!secou && diasParto > 0) {
+                LocalDate dataSecagem = previsao.minusDays(DIAS_SECAGEM_ANTES_DO_PARTO);
+                long dias = ChronoUnit.DAYS.between(hoje, dataSecagem);
+                if (dias <= 7) {
+                    alertas.add(alerta("secagem-" + animal.getId(), animal, "secagem", urgenciaPrazo(dias), dias,
+                            textoPrazo("Secagem", dias, dataSecagem) + " (parto previsto " + formatar(previsao) + ")"));
                 }
             }
-
-            if (ultimo != null && "cio".equals(ultimo.getTipo())) {
-                LocalDate proximoCio = ultimo.getData().plusDays(cioDias);
-                long dias = ChronoUnit.DAYS.between(hoje, proximoCio);
-                if (dias >= -3 && dias <= 3) {
-                    alertas.add(new AlertaDoDia(animal.getBrinco(), animal.getNome(),
-                            dias <= 0 ? "urgente" : "proximo",
-                            "Janela de cio prevista — " + formatar(proximoCio)));
+            boolean entrouPreParto = posCobertura.stream().anyMatch(e -> "pre_parto".equals(e.getTipo()));
+            if (!entrouPreParto && diasParto > 0) {
+                LocalDate dataPreParto = previsao.minusDays(DIAS_PRE_PARTO_ANTES_DO_PARTO);
+                long dias = ChronoUnit.DAYS.between(hoje, dataPreParto);
+                if (dias <= 7) {
+                    alertas.add(alerta("preparto-" + animal.getId(), animal, "preparto", urgenciaPrazo(dias), dias,
+                            textoPrazo("Entrada no pré-parto", dias, dataPreParto)));
                 }
             }
+            return;
+        }
 
-            List<EventoSaude> saudeAnimal = todaSaude.stream()
-                    .filter(e -> animal.getId().equals(e.getAnimalId()))
-                    .toList();
+        // cobertura ainda sem diagnóstico: observar retorno de cio e cobrar o diagnóstico
+        LocalDate retorno = cobertura.getData().plusDays(cioDias);
+        alertaJanelaCio(animal, "retorno", retorno, hoje,
+                "Observar retorno de cio após a cobertura — janela " + formatar(retorno), alertas);
 
-            for (EventoSaude e : saudeAnimal) {
-                if (e.getCarenciaLeiteDias() != null) {
-                    LocalDate fim = e.getData().plusDays(e.getCarenciaLeiteDias());
-                    if (!hoje.isAfter(fim)) {
-                        alertas.add(new AlertaDoDia(animal.getBrinco(), animal.getNome(), "ativo",
-                                "Leite em carência até " + formatar(fim) + " (" + e.getProduto() + ")"));
-                    }
-                }
-                if (e.getProximaAplicacaoDias() != null) {
-                    LocalDate prox = e.getData().plusDays(e.getProximaAplicacaoDias());
-                    long dias = ChronoUnit.DAYS.between(hoje, prox);
-                    if (dias <= 15) {
-                        String texto = dias < 0
-                                ? e.getProduto() + ": reaplicação atrasada (" + (-dias) + "d)"
-                                : e.getProduto() + ": próxima aplicação em " + dias + " dia(s)";
-                        alertas.add(new AlertaDoDia(animal.getBrinco(), animal.getNome(),
-                                dias < 0 ? "atrasado" : dias <= 3 ? "urgente" : "proximo", texto));
-                    }
+        long diasDesdeCobertura = ChronoUnit.DAYS.between(cobertura.getData(), hoje);
+        if (diasDesdeCobertura >= DIAS_PARA_DIAGNOSTICO && diasParto > 15) {
+            String urgencia = diasDesdeCobertura > 60 ? "atrasado" : diasDesdeCobertura >= 45 ? "urgente" : "proximo";
+            alertas.add(alerta("diagnostico-" + animal.getId(), animal, "diagnostico", urgencia,
+                    DIAS_PARA_DIAGNOSTICO - diasDesdeCobertura,
+                    "Diagnóstico de prenhez pendente — " + diasDesdeCobertura + " dias desde a cobertura de "
+                            + formatar(cobertura.getData())));
+        }
+    }
+
+    /** Previsão informada no diagnóstico/confirmação tem prioridade; senão, cobertura + gestação configurada. */
+    private LocalDate previsaoParto(EventoReproducao cobertura, List<EventoReproducao> posCobertura, int gestacaoDias) {
+        return posCobertura.stream()
+                .filter(e -> e.getPrevisaoParto() != null)
+                .map(EventoReproducao::getPrevisaoParto)
+                .findFirst()
+                .orElse(cobertura.getData().plusDays(gestacaoDias));
+    }
+
+    private void alertaJanelaCio(Animal animal, String prefixo, LocalDate data, LocalDate hoje, String texto,
+                                 List<AlertaDoDia> alertas) {
+        long dias = ChronoUnit.DAYS.between(hoje, data);
+        if (dias >= -3 && dias <= 3) {
+            alertas.add(alerta(prefixo + "-" + animal.getId(), animal, "cio", dias <= 0 ? "urgente" : "proximo", dias, texto));
+        }
+    }
+
+    // ------------------------------------------------------------------ saúde
+
+    private void alertasSaude(Animal animal, List<EventoSaude> eventos, LocalDate hoje, List<AlertaDoDia> alertas) {
+        for (EventoSaude e : eventos) {
+            if (e.getCarenciaLeiteDias() != null && e.getCarenciaLeiteDias() > 0) {
+                LocalDate fim = e.getData().plusDays(e.getCarenciaLeiteDias());
+                if (!hoje.isAfter(fim)) {
+                    alertas.add(alerta("carencia-" + e.getId(), animal, "carencia", "ativo", null,
+                            "Leite em carência até " + formatar(fim) + " (" + e.getProduto() + ")"));
                 }
             }
         }
 
-        alertas.sort(Comparator.comparingInt(a -> ORDEM_URGENCIA.getOrDefault(a.getUrgencia(), 9)));
-        return alertas;
+        // Reaplicação: só a aplicação mais recente de cada produto conta — uma dose nova encerra o alerta da anterior.
+        Map<String, EventoSaude> ultimaPorProduto = new LinkedHashMap<>();
+        eventos.stream()
+                .sorted(Comparator.comparing(EventoSaude::getData)
+                        .thenComparing(EventoSaude::getId, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .reversed())
+                .forEach(e -> ultimaPorProduto.putIfAbsent(chaveProduto(e), e));
+
+        for (EventoSaude e : ultimaPorProduto.values()) {
+            if (e.getProximaAplicacaoDias() == null || e.getProximaAplicacaoDias() <= 0) continue;
+            LocalDate prox = e.getData().plusDays(e.getProximaAplicacaoDias());
+            long dias = ChronoUnit.DAYS.between(hoje, prox);
+            if (dias <= 15) {
+                String texto = dias < 0
+                        ? e.getProduto() + ": reaplicação atrasada (" + (-dias) + "d)"
+                        : e.getProduto() + ": próxima aplicação em " + dias + " dia(s)";
+                alertas.add(alerta("reaplicacao-" + e.getId(), animal, "saude", urgenciaPrazo(dias), dias, texto));
+            }
+        }
+    }
+
+    private String chaveProduto(EventoSaude e) {
+        return e.getTipo() + "|" + (e.getProduto() == null ? "" : e.getProduto().trim().toLowerCase(Locale.ROOT));
+    }
+
+    // ------------------------------------------------------------------ utilitários
+
+    private AlertaDoDia alerta(String id, Animal animal, String tipo, String urgencia, Long dias, String texto) {
+        return new AlertaDoDia(id, animal.getId(), animal.getBrinco(), animal.getNome(), tipo, urgencia, dias, texto);
     }
 
     private String urgenciaParto(long dias) {
@@ -135,15 +249,22 @@ public class PainelDoDiaService {
         return "proximo";
     }
 
-    private boolean ehDiagnosticoNegativo(EventoReproducao evento) {
-        return ("diagnostico".equals(evento.getTipo()) || "diagnostico_prenhez".equals(evento.getTipo()))
-                && ("negativo".equals(evento.getResultado()) || "vazia".equals(evento.getResultado()));
+    private String urgenciaPrazo(long dias) {
+        if (dias < 0) return "atrasado";
+        if (dias <= 3) return "urgente";
+        return "proximo";
     }
 
     private String textoParto(long dias, LocalDate previsao) {
         if (dias < 0) return "Parto previsto há " + (-dias) + " dia(s) — " + formatar(previsao);
         if (dias == 0) return "Parto previsto para hoje";
         return "Parto previsto em " + dias + " dia(s) — " + formatar(previsao);
+    }
+
+    private String textoPrazo(String acao, long dias, LocalDate data) {
+        if (dias < 0) return acao + " atrasada há " + (-dias) + " dia(s) — prevista para " + formatar(data);
+        if (dias == 0) return acao + " prevista para hoje";
+        return acao + " prevista em " + dias + " dia(s) — " + formatar(data);
     }
 
     private String formatar(LocalDate data) {

@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,8 +13,10 @@ import java.time.LocalDateTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Animal {
 
+    // Somente leitura no JSON: um id vindo do cliente faria o save() virar UPDATE de outro registro.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -21,6 +24,8 @@ public class Animal {
     @JsonIgnore
     private Fazenda fazenda;
 
+    @NotBlank(message = "é obrigatório")
+    @Size(max = 30)
     @Column(nullable = false, length = 30)
     private String brinco;
 
@@ -43,7 +48,9 @@ public class Animal {
     @Column(columnDefinition = "TEXT")
     private String notas;
 
+    // Definida só pelo upload (AnimalService.salvarFoto), nunca pelo JSON do cliente.
     @Column(name = "foto_url", length = 500)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String fotoUrl;
 
     @Column(name = "criado_em", updatable = false)

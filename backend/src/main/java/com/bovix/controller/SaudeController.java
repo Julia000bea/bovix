@@ -2,6 +2,7 @@ package com.bovix.controller;
 
 import com.bovix.model.EventoSaude;
 import com.bovix.service.SaudeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class SaudeController {
     }
 
     @PostMapping("/animais/{animalId}/saude")
-    public ResponseEntity<EventoSaude> criar(@PathVariable Long animalId, @RequestBody EventoSaude dados) {
+    public ResponseEntity<EventoSaude> criar(@PathVariable Long animalId, @Valid @RequestBody EventoSaude dados) {
         return ResponseEntity.ok(service.criar(animalId, dados));
     }
 
