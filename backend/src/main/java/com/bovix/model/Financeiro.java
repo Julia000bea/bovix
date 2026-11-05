@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,15 +25,19 @@ public class Financeiro {
     @JsonIgnore
     private Fazenda fazenda;
 
+    @NotNull(message = "é obrigatória")
     @Column(nullable = false)
     private LocalDate data;
 
+    @NotBlank(message = "é obrigatória")
     @Column(nullable = false, length = 30)
     private String categoria;
 
     @Column(length = 255)
     private String descricao;
 
+    @NotNull(message = "é obrigatório")
+    @PositiveOrZero
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal valor;
 

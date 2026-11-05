@@ -6,4 +6,6 @@ import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByEmail(String email);
+    // contas antigas podem ter sido criadas com maiúsculas no e-mail
+    Optional<Usuario> findFirstByEmailIgnoreCaseOrderByIdAsc(String email);
 }

@@ -1,106 +1,37 @@
-import { useMemo } from "react";
-import { addDays, daysBetween, formatDate, todayStr } from "../utils/date";
+import { useEffect, useMemo, useState } from "react";
+import { painelService } from "../services/painelService";
 
 /**
- * Motor de alertas do Quadro do dia: cio previsto, parto previsto,
- * carência do leite e reaplicação de vacinas/medicamentos.
+ * Quadro do dia: os alertas (parto, secagem, pré-parto, diagnóstico pendente, cio, carência
+ * do leite e reaplicação) são calculados só no backend — a mesma regra do e-mail diário.
+ * Recarrega sempre que os dados da fazenda mudam (novo evento, animal ou configuração).
  */
 export function useAlerts({ animais, reproducao, saude, config }) {
-  return useMemo(() => {
-    const today = todayStr();
-    const alerts = [];
-    const ativos = animais.filter((a) => a.status === "Ativa");
-    const gestacaoDias = Number(config?.gestacaoDias) || 283;
-    const cioDias = Number(config?.cioDias) || 21;
+  const [alertas, setAlertas] = useState([]);
 
-    for (const a of ativos) {
-      const repro = reproducao
-        .filter((e) => e.animalId === a.id)
-        .sort((x, y) => (x.data < y.data ? 1 : -1));
-      const last = repro[0];
-
-      if (last?.tipo === "inseminacao") {
-        const negDepois = repro.some(
-          (e) => ["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
-            && ["negativo", "vazia"].includes(e.resultado)
-            && e.data > last.data
-        );
-        const partoDepois = repro.some((e) => e.tipo === "parto" && e.data > last.data);
-
-        if (!negDepois && !partoDepois) {
-          const previsao = addDays(last.data, gestacaoDias);
-          const dias = daysBetween(today, previsao);
-          if (dias <= 15 && dias >= -10) {
-            alerts.push({
-              id: `parto-${a.id}`, animal: a, dias,
-              urgencia: dias < 0 ? "atrasado" : dias <= 7 ? "urgente" : "proximo",
-              icone: "parto",
-              texto: dias < 0
-                ? `Parto previsto há ${-dias} dia(s) — ${formatDate(previsao)}`
-                : dias === 0
-                ? `Parto previsto para hoje`
-                : `Parto previsto em ${dias} dia(s) — ${formatDate(previsao)}`,
-            });
-          }
-        } else if (negDepois) {
-          const cioBase = repro.find((e) => ["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
-            && ["negativo", "vazia"].includes(e.resultado));
-          const proximoCio = addDays(cioBase.data, cioDias);
-          const dias = daysBetween(today, proximoCio);
-          if (dias >= -3 && dias <= 3) {
-            alerts.push({
-              id: `retorno-${a.id}`, animal: a, dias,
-              urgencia: dias <= 0 ? "urgente" : "proximo",
-              icone: "cio",
-              texto: `Possível retorno de cio (diagnóstico negativo) — janela ${formatDate(proximoCio)}`,
-            });
-          }
-        }
-      }
-
-      if (last?.tipo === "cio") {
-        const proximoCio = addDays(last.data, cioDias);
-        const dias = daysBetween(today, proximoCio);
-        if (dias >= -3 && dias <= 3) {
-          alerts.push({
-            id: `cio-${a.id}`, animal: a, dias,
-            urgencia: dias <= 0 ? "urgente" : "proximo",
-            icone: "cio",
-            texto: `Janela de cio prevista — ${formatDate(proximoCio)}`,
-          });
-        }
-      }
-
-      const saudeAnimal = saude.filter((e) => e.animalId === a.id);
-      for (const e of saudeAnimal) {
-        if (e.carenciaLeiteDias) {
-          const fim = addDays(e.data, Number(e.carenciaLeiteDias));
-          if (today <= fim) {
-            alerts.push({
-              id: `carencia-${e.id}`, animal: a,
-              urgencia: "ativo", icone: "carencia",
-              texto: `Leite em carência até ${formatDate(fim)} (${e.produto})`,
-            });
-          }
-        }
-        if (e.proximaAplicacaoDias) {
-          const prox = addDays(e.data, Number(e.proximaAplicacaoDias));
-          const dias = daysBetween(today, prox);
-          if (dias <= 15) {
-            alerts.push({
-              id: `reaplicacao-${e.id}`, animal: a,
-              urgencia: dias < 0 ? "atrasado" : dias <= 3 ? "urgente" : "proximo",
-              icone: "saude",
-              texto: dias < 0
-                ? `${e.produto}: reaplicação atrasada (${-dias}d)`
-                : `${e.produto}: próxima aplicação em ${dias} dia(s)`,
-            });
-          }
-        }
-      }
-    }
-
-    const ordem = { atrasado: 0, urgente: 1, ativo: 2, proximo: 3 };
-    return alerts.sort((a, b) => ordem[a.urgencia] - ordem[b.urgencia]);
+  useEffect(() => {
+    let ativo = true;
+    painelService
+      .alertas()
+      .then((lista) => {
+        if (ativo) setAlertas(lista || []);
+      })
+      .catch((e) => console.error("Falha ao carregar o quadro do dia:", e));
+    return () => {
+      ativo = false;
+    };
   }, [animais, reproducao, saude, config]);
+
+  return useMemo(
+    () =>
+      alertas.map((a) => ({
+        id: a.id,
+        animal: animais.find((x) => x.id === a.animalId) || { id: a.animalId, brinco: a.animalBrinco, nome: a.animalNome },
+        dias: a.dias,
+        urgencia: a.urgencia,
+        icone: a.tipo,
+        texto: a.texto,
+      })),
+    [alertas, animais]
+  );
 }

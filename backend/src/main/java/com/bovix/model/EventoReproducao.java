@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,9 +24,11 @@ public class EventoReproducao {
     @JsonIgnore
     private Animal animal;
 
+    @NotBlank(message = "é obrigatório")
     @Column(nullable = false, length = 30)
     private String tipo;
 
+    @NotNull(message = "é obrigatória")
     @Column(nullable = false)
     private LocalDate data;
 
@@ -42,6 +45,11 @@ public class EventoReproducao {
     @JoinColumn(name = "cio_vinculado_id")
     @JsonIgnore
     private EventoReproducao cioVinculado;
+
+    // Id do cio de origem enviado pelo cliente; o service valida e resolve para cioVinculado.
+    @Transient
+    @JsonIgnore
+    private Long cioVinculadoIdInformado;
 
     @Column(name = "previsao_parto")
     private LocalDate previsaoParto;
@@ -76,5 +84,10 @@ public class EventoReproducao {
     @JsonProperty("cioVinculadoId")
     public Long getCioVinculadoId() {
         return cioVinculado != null ? cioVinculado.getId() : null;
+    }
+
+    @JsonProperty("cioVinculadoId")
+    public void setCioVinculadoId(Long id) {
+        this.cioVinculadoIdInformado = id;
     }
 }

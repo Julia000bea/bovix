@@ -14,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -26,15 +28,19 @@ public class AuthService {
     private final ConfiguracaoRepository configuracaoRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final LimiteTentativasLogin limiteTentativas;
 
+    // usuário, fazenda e configuração nascem juntos: se um falhar, nada fica gravado pela metade
+    @Transactional
     public AuthResponse registrar(RegistroRequest req) {
-        if (usuarioRepository.findByEmail(req.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Já existe uma conta com este e-mail.");
+        String email = normalizarEmail(req.getEmail());
+        if (usuarioRepository.findFirstByEmailIgnoreCaseOrderByIdAsc(email).isPresent()) {
+            throw new RegraNegocioException("Já existe uma conta com este e-mail.");
         }
 
         Usuario usuario = Usuario.builder()
-                .nome(req.getNome())
-                .email(req.getEmail())
+                .nome(req.getNome().trim())
+                .email(email)
                 .senhaHash(passwordEncoder.encode(req.getSenha()))
                 .build();
         usuario = usuarioRepository.save(usuario);
@@ -54,12 +60,17 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest req) {
-        Usuario usuario = usuarioRepository.findByEmail(req.getEmail())
-                .orElseThrow(() -> new BadCredentialsException("E-mail ou senha inválidos."));
+        String email = normalizarEmail(req.getEmail());
+        limiteTentativas.verificar(email);
 
-        if (!passwordEncoder.matches(req.getSenha(), usuario.getSenhaHash())) {
+        Usuario usuario = usuarioRepository.findByEmail(req.getEmail().trim())
+                .or(() -> usuarioRepository.findFirstByEmailIgnoreCaseOrderByIdAsc(email))
+                .orElse(null);
+        if (usuario == null || !passwordEncoder.matches(req.getSenha(), usuario.getSenhaHash())) {
+            limiteTentativas.registrarFalha(email);
             throw new BadCredentialsException("E-mail ou senha inválidos.");
         }
+        limiteTentativas.registrarSucesso(email);
 
         List<Fazenda> fazendas = fazendaRepository.findByUsuario_Id(usuario.getId());
         return montarResposta(usuario, fazendas);
@@ -68,6 +79,10 @@ public class AuthService {
     public AuthResponse me(Usuario usuario) {
         List<Fazenda> fazendas = fazendaRepository.findByUsuario_Id(usuario.getId());
         return montarResposta(usuario, fazendas);
+    }
+
+    private String normalizarEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private AuthResponse montarResposta(Usuario usuario, List<Fazenda> fazendas) {

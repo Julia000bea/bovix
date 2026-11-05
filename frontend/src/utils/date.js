@@ -1,16 +1,23 @@
 // Funções utilitárias de data usadas em toda a aplicação.
-// Sempre trabalhamos com strings 'YYYY-MM-DD' para evitar problemas de fuso horário.
+// Sempre trabalhamos com strings 'YYYY-MM-DD' no fuso LOCAL do navegador — toISOString() é UTC
+// e, no Brasil, viraria o dia seguinte depois das 21h.
 
-export const todayStr = () => new Date().toISOString().slice(0, 10);
+const pad = (n) => String(n).padStart(2, "0");
+const formatLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const partes = (dateStr) => dateStr.split("-").map(Number);
+
+export const todayStr = () => formatLocal(new Date());
 
 export const addDays = (dateStr, n) => {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = partes(dateStr);
+  return formatLocal(new Date(y, m - 1, d + n));
 };
 
-export const daysBetween = (fromStr, toStr) =>
-  Math.round((new Date(toStr + "T00:00:00") - new Date(fromStr + "T00:00:00")) / 86400000);
+export const daysBetween = (fromStr, toStr) => {
+  const [y1, m1, d1] = partes(fromStr);
+  const [y2, m2, d2] = partes(toStr);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+};
 
 export const formatDate = (dateStr) => {
   if (!dateStr) return "—";

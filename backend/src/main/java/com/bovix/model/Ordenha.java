@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ public class Ordenha {
     @JsonIgnore
     private Animal animal;
 
+    @NotNull(message = "é obrigatória")
     @Column(nullable = false)
     private LocalDate data;
 
@@ -36,6 +38,8 @@ public class Ordenha {
     @Builder.Default
     private String periodo = "Dia todo";
 
+    @NotNull(message = "é obrigatório")
+    @PositiveOrZero
     @Column(nullable = false, precision = 8, scale = 2)
     private BigDecimal litros;
 

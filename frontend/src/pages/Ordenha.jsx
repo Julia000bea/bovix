@@ -1,49 +1,61 @@
 import { useMemo, useState } from "react";
 import { Plus, TrendingUp, Trash2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Field, EmptyState, inputCls, inputStyle } from "../components/ui";
+import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, fMono } from "../utils/tokens";
 import { addDays, formatDate, todayStr } from "../utils/date";
 import { novaOrdenha } from "../models/Ordenha";
 import { rotuloAnimal } from "../models/Animal";
 import { ordenhaService } from "../services/ordenhaService";
+import { litrosPorDia } from "../utils/producao";
 
 export default function Ordenha({ data }) {
   const { animais, ordenha, setOrdenha } = data;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(novaOrdenha());
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
 
   const add = async () => {
     if (!form.litros) return;
     setSalvando(true);
+    setErro("");
     try {
       const criado = await ordenhaService.criar(form, form.animalId || undefined);
       setOrdenha((prev) => [...prev, criado]);
       setForm(novaOrdenha());
       setOpen(false);
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar a ordenha.");
     } finally {
       setSalvando(false);
     }
   };
 
   const remove = async (id) => {
-    await ordenhaService.remover(id);
-    setOrdenha((prev) => prev.filter((e) => e.id !== id));
+    if (!window.confirm("Remover este registro de ordenha?")) return;
+    setErro("");
+    try {
+      await ordenhaService.remover(id);
+      setOrdenha((prev) => prev.filter((e) => e.id !== id));
+    } catch (e) {
+      setErro(e.message || "Não foi possível remover o registro.");
+    }
   };
 
   const chartData = useMemo(() => {
-    const map = {};
-    for (let i = 13; i >= 0; i--) map[addDays(todayStr(), -i)] = 0;
-    for (const o of ordenha) if (map[o.data] !== undefined) map[o.data] += Number(o.litros || 0);
-    return Object.entries(map).map(([d, litros]) => ({ data: formatDate(d).slice(0, 5), litros }));
+    const porDia = litrosPorDia(ordenha);
+    const dias = [];
+    for (let i = 13; i >= 0; i--) dias.push(addDays(todayStr(), -i));
+    return dias.map((d) => ({ data: formatDate(d).slice(0, 5), litros: porDia[d] || 0 }));
   }, [ordenha]);
 
   const registros = [...ordenha].sort((a, b) => (a.data < b.data ? 1 : -1)).slice(0, 30);
 
   return (
     <div className="flex flex-col gap-4">
+      <ErrorText text={erro} />
       <div className="rounded-xl border bg-white p-4" style={{ borderColor: C.line }}>
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp size={16} color={C.leite} />

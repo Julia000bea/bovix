@@ -185,7 +185,8 @@ O Neon mudou a forma de criar conta nova: hoje passa pela Vercel.
 2. "New" → "Web Service" → conecte o repositório do GitHub → aponte o "Root Directory" para `backend`.
 3. O Render detecta o `Dockerfile` sozinho (incluído no projeto) — não precisa configurar build command.
 4. Em "Environment", adicione as variáveis:
-   - `BOVIX_JWT_SECRET` (gere um valor aleatório forte)
+   - `BOVIX_JWT_SECRET` (**obrigatória**: valor aleatório com pelo menos 32 bytes — sem ela a API não sobe)
+   - `BOVIX_FUSO_HORARIO` (opcional, padrão `America/Sao_Paulo` — o servidor do Render roda em UTC)
    - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<host-do-neon>/<banco>?sslmode=require`
    - `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` (do Neon)
    - `BOVIX_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` (se for usar o relatório por e-mail)
@@ -211,7 +212,7 @@ O código está pronto, mas nenhuma IA consegue "publicar" isso por você — s�
 que só você pode tomar/criar. Aqui está o roteiro, na ordem:
 
 ### 1. Segredos e variáveis de ambiente
-- Gere um `BOVIX_JWT_SECRET` forte e único: `openssl rand -base64 64`. Nunca reuse o valor padrão do `application.yml`.
+- Gere um `BOVIX_JWT_SECRET` forte e único: `openssl rand -base64 64`. Não há valor padrão: a API se recusa a subir sem ele (ou com menos de 32 bytes).
 - Defina senha forte do banco (não use `bovix/bovix` do exemplo).
 - Guarde esses segredos num gerenciador (Doppler, AWS Secrets Manager, Railway/Render env vars, etc.), nunca no código.
 

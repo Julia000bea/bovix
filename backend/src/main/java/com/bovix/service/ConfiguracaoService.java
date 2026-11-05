@@ -1,5 +1,6 @@
 package com.bovix.service;
 
+import com.bovix.dto.ConfiguracaoRequest;
 import com.bovix.model.Configuracao;
 import com.bovix.model.Fazenda;
 import com.bovix.repository.ConfiguracaoRepository;
@@ -21,13 +22,21 @@ public class ConfiguracaoService {
         });
     }
 
-    public Configuracao atualizar(Long fazendaId, Configuracao dados) {
+    public Configuracao atualizar(Long fazendaId, ConfiguracaoRequest dados) {
         Configuracao config = buscarOuCriar(fazendaId);
         if (dados.getGestacaoDias() != null) config.setGestacaoDias(dados.getGestacaoDias());
         if (dados.getCioDias() != null) config.setCioDias(dados.getCioDias());
         if (dados.getNotificacaoAtiva() != null) config.setNotificacaoAtiva(dados.getNotificacaoAtiva());
-        if (dados.getNotificacaoEmail() != null) config.setNotificacaoEmail(dados.getNotificacaoEmail());
+        if (dados.getNotificacaoEmail() != null) {
+            String email = dados.getNotificacaoEmail().trim();
+            config.setNotificacaoEmail(email.isEmpty() ? null : email);
+        }
         if (dados.getNotificacaoHorario() != null) config.setNotificacaoHorario(dados.getNotificacaoHorario());
+
+        if (Boolean.TRUE.equals(config.getNotificacaoAtiva())
+                && (config.getNotificacaoEmail() == null || config.getNotificacaoEmail().isBlank())) {
+            throw new RegraNegocioException("Informe o e-mail de destino para ativar o relatório diário.");
+        }
         return repository.save(config);
     }
 }

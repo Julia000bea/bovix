@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { addDays, daysBetween, todayStr } from "../utils/date";
 import { CATEGORIAS_GASTO } from "../utils/tokens";
+import { litrosPorDia } from "../utils/producao";
 
 /**
  * Motor de insights de decisão do Dashboard: agrega alertas e cruza tendências
@@ -33,11 +34,11 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     }
 
     // 3) produção: últimos 7 dias vs 7 dias anteriores
+    const producaoPorDia = litrosPorDia(ordenha);
     const somaPeriodo = (inicioOffset, fimOffset) => {
       let s = 0;
       for (let i = inicioOffset; i <= fimOffset; i++) {
-        const d = addDays(today, -i);
-        s += ordenha.filter((o) => o.data === d).reduce((acc, o) => acc + Number(o.litros || 0), 0);
+        s += producaoPorDia[addDays(today, -i)] || 0;
       }
       return s;
     };
@@ -87,18 +88,19 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     const ativos = animais.filter((a) => a.status === "Ativa");
     for (const a of ativos) {
       const repro = reproducao.filter((e) => e.animalId === a.id).sort((x, y) => (x.data < y.data ? 1 : -1));
-      const ultimaInsem = repro.find((e) => e.tipo === "inseminacao");
-      if (!ultimaInsem) continue;
+      // cobertura = inseminação ou monta natural; parto, novo cio ou diagnóstico "vazia" encerram a gestação
+      const ultimaCobertura = repro.find((e) => ["inseminacao", "reproducao"].includes(e.tipo));
+      if (!ultimaCobertura) continue;
       const temEventoDepois = repro.some(
-        (e) => (e.tipo === "parto" || (["diagnostico", "diagnostico_prenhez"].includes(e.tipo)
-          && ["negativo", "vazia"].includes(e.resultado))) && e.data > ultimaInsem.data
+        (e) => (e.tipo === "parto" || ["cio_detectado", "cio_confirmado"].includes(e.tipo)
+          || (e.tipo === "diagnostico_prenhez" && e.resultado === "vazia")) && e.data > ultimaCobertura.data
       );
       if (temEventoDepois) continue;
-      const diasGestante = daysBetween(ultimaInsem.data, today);
+      const diasGestante = daysBetween(ultimaCobertura.data, today);
       if (diasGestante > gestacaoDias + 10) {
         insights.push({
           id: `ins-gestacao-${a.id}`, tipo: "atencao", icone: "dados",
-          texto: `A vaca #${a.brinco}${a.nome ? " (" + a.nome + ")" : ""} está há ${diasGestante} dias desde a última inseminação, ${diasGestante - gestacaoDias} a mais que o previsto. Verifique se o parto já ocorreu e não foi registrado, ou se a data está correta.`,
+          texto: `A vaca #${a.brinco}${a.nome ? " (" + a.nome + ")" : ""} está há ${diasGestante} dias desde a última cobertura, ${diasGestante - gestacaoDias} a mais que o previsto. Verifique se o parto já ocorreu e não foi registrado, ou se a data está correta.`,
         });
       }
     }

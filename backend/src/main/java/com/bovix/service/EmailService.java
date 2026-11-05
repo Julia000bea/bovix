@@ -7,6 +7,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final Clock clock;
 
     @Value("${bovix.notificacao.remetente}")
     private String remetente;
@@ -25,7 +27,7 @@ public class EmailService {
         mensagem.setFrom(remetente);
         mensagem.setTo(destino);
         mensagem.setSubject("Bovix — Quadro do dia (" + nomeFazenda + ") — "
-                + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+                + LocalDate.now(clock).format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         mensagem.setText(montarCorpo(nomeFazenda, alertas));
         mailSender.send(mensagem);
     }
@@ -35,7 +37,7 @@ public class EmailService {
         sb.append("Bom dia! Aqui está o quadro do dia da ").append(nomeFazenda).append(":\n\n");
 
         if (alertas.isEmpty()) {
-            sb.append("Nenhum alerta de cio, parto, carência ou vacina para os próximos dias.\n");
+            sb.append("Nenhum alerta de reprodução, carência ou vacina para os próximos dias.\n");
         } else {
             for (AlertaDoDia a : alertas) {
                 sb.append("- [").append(rotuloUrgencia(a.getUrgencia())).append("] #").append(a.getAnimalBrinco());
@@ -52,6 +54,7 @@ public class EmailService {
     }
 
     private String rotuloUrgencia(String urgencia) {
+        if (urgencia == null) return "PRÓXIMO";
         return switch (urgencia) {
             case "atrasado" -> "ATRASADO";
             case "urgente" -> "URGENTE";

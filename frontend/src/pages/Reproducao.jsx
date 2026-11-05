@@ -1,18 +1,22 @@
 import { useState } from "react";
 import { Plus, Trash2, CheckCircle, Circle } from "lucide-react";
-import { Field, EmptyState, inputCls, inputStyle } from "../components/ui";
+import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, TIPOS_REPRO, fMono } from "../utils/tokens";
 import { addDays, formatDate, todayStr } from "../utils/date";
 import { novoEventoReproducao } from "../models/EventoReproducao";
 import { rotuloAnimal } from "../models/Animal";
 import { reproducaoService } from "../services/reproducaoService";
+import { animaisService } from "../services/animaisService";
+
+const TIPOS_CATEGORIA = ["parto", "secagem", "pre_parto"];
 
 export default function Reproducao({ data }) {
   const { animais, setAnimais, reproducao, setReproducao, config } = data;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(novoEventoReproducao());
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
   const [registrandoReproducao, setRegistrandoReproducao] = useState(null);
   const [modalReproducao, setModalReproducao] = useState({
     aberta: false,
@@ -29,25 +33,35 @@ export default function Reproducao({ data }) {
   const gestacaoDias = Number(config?.gestacaoDias) || 283;
   const preverParto = (dataBase) => (dataBase ? addDays(dataBase, gestacaoDias) : null);
 
+  // A categoria (lactante/seca) é decidida pelo backend a partir do evento mais recente;
+  // depois de criar/excluir parto, secagem ou pré-parto, buscamos o animal atualizado.
+  const sincronizarAnimal = async (animalId, tipo) => {
+    if (!TIPOS_CATEGORIA.includes(tipo)) return;
+    const atualizado = await animaisService.buscar(animalId);
+    setAnimais((prev) => prev.map((a) => (a.id === atualizado.id ? atualizado : a)));
+  };
+
   const add = async () => {
     if (!form.animalId || !form.tipo) return;
+    if (form.tipo === "diagnostico_prenhez" && !form.resultado) {
+      setErro("Informe o resultado do diagnóstico: prenhe ou vazia.");
+      return;
+    }
     setSalvando(true);
+    setErro("");
     try {
-      const criado = await reproducaoService.criar(form.animalId, form);
+      const criado = await reproducaoService.criar(form.animalId, {
+        ...form,
+        resultado: form.tipo === "diagnostico_prenhez" ? form.resultado : null,
+        previsaoParto: form.tipo === "prenhez_confirmada" ? form.previsaoParto || null : null,
+      });
       setReproducao((prev) => [...prev, criado]);
-
-      if (form.tipo === "parto") {
-        setAnimais((prev) =>
-          prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca lactante" } : a))
-        );
-      } else if (form.tipo === "secagem" || form.tipo === "pre_parto") {
-        setAnimais((prev) =>
-          prev.map((a) => (a.id === Number(form.animalId) ? { ...a, categoria: "Vaca seca" } : a))
-        );
-      }
+      await sincronizarAnimal(criado.animalId, criado.tipo);
 
       setForm(novoEventoReproducao());
       setOpen(false);
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar o evento.");
     } finally {
       setSalvando(false);
     }
@@ -55,9 +69,12 @@ export default function Reproducao({ data }) {
 
   const confirmarCio = async (cioId) => {
     setSalvando(true);
+    setErro("");
     try {
       const atualizado = await reproducaoService.confirmarCio(cioId);
       setReproducao((prev) => prev.map((e) => (e.id === cioId ? atualizado : e)));
+    } catch (e) {
+      setErro(e.message || "Não foi possível confirmar o cio.");
     } finally {
       setSalvando(false);
     }
@@ -100,27 +117,42 @@ export default function Reproducao({ data }) {
     }
 
     setSalvando(true);
+    setErro("");
     try {
       const novaReproducao = {
         animalId,
         tipo: tipoReproducao === "touro" ? "reproducao" : "inseminacao",
         data: dataReproducao,
-        detalhe: tipoReproducao === "touro" ? `${touroDados}\n${observacoes}` : semenCodigo,
+        detalhe: tipoReproducao === "touro" ? [touroDados, observacoes].filter(Boolean).join(" · ") : semenCodigo,
         cioVinculadoId: cioId,
       };
 
       const criada = await reproducaoService.criar(animalId, novaReproducao);
       setReproducao((prev) => [...prev, criada]);
       setModalReproducao({ ...modalReproducao, aberta: false });
+    } catch (e) {
+      setErro(e.message || "Não foi possível registrar a reprodução.");
     } finally {
       setSalvando(false);
     }
   };
 
-  const remove = async (id) => {
-    await reproducaoService.remover(id);
-    setReproducao((prev) => prev.filter((e) => e.id !== id));
+  const remove = async (evento) => {
+    if (!window.confirm("Remover este evento reprodutivo?")) return;
+    setErro("");
+    try {
+      await reproducaoService.remover(evento.id);
+      // coberturas ligadas a este cio perdem o vínculo no banco (ON DELETE SET NULL)
+      setReproducao((prev) => prev
+        .filter((e) => e.id !== evento.id)
+        .map((e) => (e.cioVinculadoId === evento.id ? { ...e, cioVinculadoId: null } : e)));
+      await sincronizarAnimal(evento.animalId, evento.tipo);
+    } catch (e) {
+      setErro(e.message || "Não foi possível remover o evento.");
+    }
   };
+
+  const cioJaCoberto = (cioId) => reproducao.some((e) => e.cioVinculadoId === cioId);
 
   const agrupadosPorAnimal = animais.map((animal) => ({
     animal,
@@ -131,6 +163,7 @@ export default function Reproducao({ data }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {!modalReproducao.aberta && <ErrorText text={erro} />}
       <div className="flex justify-end">
         <button
           onClick={() => {
@@ -178,12 +211,13 @@ export default function Reproducao({ data }) {
               className={inputCls}
               style={inputStyle}
               value={form.data}
+              max={todayStr()}
               onChange={(e) => setForm({ ...form, data: e.target.value })}
             />
           </Field>
 
-          {form.tipo === "inseminacao" && (
-            <Field label="Touro / Sêmen utilizado">
+          {["inseminacao", "reproducao"].includes(form.tipo) && (
+            <Field label={form.tipo === "inseminacao" ? "Touro / Sêmen utilizado" : "Touro utilizado"}>
               <input className={inputCls} style={inputStyle} value={form.detalhe} onChange={(e) => setForm({ ...form, detalhe: e.target.value })} />
             </Field>
           )}
@@ -191,7 +225,7 @@ export default function Reproducao({ data }) {
           {["inseminacao", "reproducao"].includes(form.tipo) && <PrevisaoParto data={preverParto(form.data)} dias={gestacaoDias} />}
 
           {form.tipo === "diagnostico_prenhez" && (
-            <Field label="Resultado do diagnóstico">
+            <Field label="Resultado do diagnóstico *">
               <select className={inputCls} style={inputStyle} value={form.resultado} onChange={(e) => setForm({ ...form, resultado: e.target.value })}>
                 <option value="">Selecione...</option>
                 <option value="prenhe">Prenhe</option>
@@ -201,12 +235,12 @@ export default function Reproducao({ data }) {
           )}
 
           {form.tipo === "prenhez_confirmada" && (
-            <Field label="Data prevista do parto (280 dias após inseminação)">
+            <Field label={`Data prevista do parto (calculada automaticamente: cobertura + ${gestacaoDias} dias; preencha só se não houver cobertura registrada)`}>
               <input
                 type="date"
                 className={inputCls}
                 style={inputStyle}
-                value={form.previsaoParto}
+                value={form.previsaoParto || ""}
                 onChange={(e) => setForm({ ...form, previsaoParto: e.target.value })}
               />
             </Field>
@@ -321,6 +355,8 @@ export default function Reproducao({ data }) {
                 className={inputCls}
                 style={inputStyle}
                 value={modalReproducao.formReproducao.dataReproducao}
+                min={modalReproducao.cioData}
+                max={todayStr()}
                 onChange={(e) =>
                   setModalReproducao({
                     ...modalReproducao,
@@ -387,10 +423,17 @@ export default function Reproducao({ data }) {
               </Field>
             )}
 
+            <div className="mt-3">
+              <ErrorText text={erro} />
+            </div>
+
             {/* Botões de Ação */}
             <div className="mt-6 flex gap-2">
               <button
-                onClick={() => setModalReproducao({ ...modalReproducao, aberta: false })}
+                onClick={() => {
+                  setModalReproducao({ ...modalReproducao, aberta: false });
+                  setErro("");
+                }}
                 disabled={salvando}
                 className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold"
                 style={{ color: C.inkSoft, borderColor: C.line, border: "1px solid" }}
@@ -452,14 +495,16 @@ export default function Reproducao({ data }) {
 
                         {(e.detalhe || e.resultado || e.previsaoParto) && (
                           <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
-                            {e.resultado && (e.resultado === "prenhe" ? "✓ Prenhe confirmada" : "✗ Vazia")}
-                            {e.detalhe && e.detalhe}
-                            {e.previsaoParto && `Parto previsto: ${formatDate(e.previsaoParto)}`}
+                            {[
+                              e.resultado && (e.resultado === "prenhe" ? "✓ Prenhe" : "✗ Vazia"),
+                              e.detalhe,
+                              e.previsaoParto && `Parto previsto: ${formatDate(e.previsaoParto)}`,
+                            ].filter(Boolean).join(" · ")}
                           </p>
                         )}
                       </div>
 
-                      <button onClick={() => remove(e.id)} className="p-1.5 rounded-md hover:bg-gray-100 shrink-0" title="Remover evento">
+                      <button onClick={() => remove(e)} className="p-1.5 rounded-md hover:bg-gray-100 shrink-0" title="Remover evento">
                         <Trash2 size={16} color={C.cio} />
                       </button>
                     </div>
@@ -478,7 +523,9 @@ export default function Reproducao({ data }) {
                       </div>
                     )}
 
-                    {(e.tipo === "cio_detectado" && e.dataConfirmacao) || e.tipo === "cio_confirmado" ? (
+                    {((e.tipo === "cio_detectado" && e.dataConfirmacao) || e.tipo === "cio_confirmado") && cioJaCoberto(e.id) ? (
+                      <p className="text-xs mt-2" style={{ color: C.pasto900 }}>✓ Cobertura registrada para este cio</p>
+                    ) : (e.tipo === "cio_detectado" && e.dataConfirmacao) || e.tipo === "cio_confirmado" ? (
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() => abrirRegistroReproducao(e.id, animal.id)}

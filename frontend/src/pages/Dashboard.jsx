@@ -2,6 +2,7 @@ import QuadroDoDia from "../components/QuadroDoDia";
 import InsightsPanel from "../components/InsightsPanel";
 import { C } from "../utils/tokens";
 import { todayStr } from "../utils/date";
+import { litrosPorDia } from "../utils/producao";
 
 export default function Dashboard({ data, alerts, insights, setTab }) {
   const { animais, ordenha } = data;
@@ -9,7 +10,7 @@ export default function Dashboard({ data, alerts, insights, setTab }) {
   const lactantes = ativos.filter((a) => a.categoria === "Vaca lactante").length;
   const secas = ativos.filter((a) => a.categoria === "Vaca seca").length;
   const hoje = todayStr();
-  const litrosHoje = ordenha.filter((o) => o.data === hoje).reduce((s, o) => s + Number(o.litros || 0), 0);
+  const litrosHoje = litrosPorDia(ordenha)[hoje] || 0;
 
   return (
     <div className="flex flex-col gap-5">

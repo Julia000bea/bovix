@@ -2,6 +2,7 @@ package com.bovix.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,15 +14,30 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    // HMAC-SHA256 exige no mínimo 256 bits (32 bytes) de chave.
+    private static final int TAMANHO_MINIMO_SEGREDO = 32;
+
     @Value("${bovix.jwt.secret}")
     private String secret;
 
     @Value("${bovix.jwt.expiration-ms}")
     private long expirationMs;
 
-    private SecretKey key() {
-        // HMAC-SHA precisa de uma chave com tamanho mínimo; em produção use um segredo longo e aleatório.
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private SecretKey chave;
+
+    /** Impede a API de subir sem um segredo próprio — nunca cai num valor padrão conhecido. */
+    @PostConstruct
+    void validarSegredo() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "Variável BOVIX_JWT_SECRET não definida. Gere um valor aleatório (ex: openssl rand -base64 64) e defina-a antes de subir a API.");
+        }
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < TAMANHO_MINIMO_SEGREDO) {
+            throw new IllegalStateException(
+                    "BOVIX_JWT_SECRET muito curta: use pelo menos " + TAMANHO_MINIMO_SEGREDO + " bytes aleatórios.");
+        }
+        chave = Keys.hmacShaKeyFor(bytes);
     }
 
     public String gerarToken(Long usuarioId, String email) {
@@ -32,13 +48,13 @@ public class JwtService {
                 .claim("uid", usuarioId)
                 .issuedAt(agora)
                 .expiration(expira)
-                .signWith(key())
+                .signWith(chave)
                 .compact();
     }
 
     /** Retorna o id do usuário (claim "uid") se o token for válido, ou lança exceção. */
     public Long validarEExtrairUsuarioId(String token) {
-        var claims = Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
+        var claims = Jwts.parser().verifyWith(chave).build().parseSignedClaims(token).getPayload();
         Object uid = claims.get("uid");
         if (uid instanceof Number numero) return numero.longValue();
         return Long.valueOf(String.valueOf(uid));

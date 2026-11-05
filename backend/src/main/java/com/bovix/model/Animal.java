@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,6 +24,8 @@ public class Animal {
     @JsonIgnore
     private Fazenda fazenda;
 
+    @NotBlank(message = "é obrigatório")
+    @Size(max = 30)
     @Column(nullable = false, length = 30)
     private String brinco;
 

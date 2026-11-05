@@ -39,7 +39,9 @@ async function request(path, options = {}) {
     );
   }
 
-  if (res.status === 401) {
+  // Rotas /auth/* (login, registro, me) tratam o 401 como erro normal: recarregar aqui
+  // engoliria a mensagem "E-mail ou senha inválidos".
+  if (res.status === 401 && !path.startsWith("/auth/")) {
     authStorage.clear();
     window.location.reload(); // sessão expirada/token inválido: volta para o login
     return null;

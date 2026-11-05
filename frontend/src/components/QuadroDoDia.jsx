@@ -1,4 +1,4 @@
-import { Baby, HeartPulse, AlertTriangle, Syringe } from "lucide-react";
+import { Baby, HeartPulse, AlertTriangle, Syringe, Milk, Stethoscope } from "lucide-react";
 import { C, fDisplay } from "../utils/tokens";
 
 const urgCfg = {
@@ -7,7 +7,10 @@ const urgCfg = {
   ativo: { bg: C.leite, fg: "#EAF3F6", label: "EM ANDAMENTO" },
   proximo: { bg: C.brinco, fg: "#FCEFDD", label: "PRÓXIMO" },
 };
-const iconFor = { parto: Baby, cio: HeartPulse, carencia: AlertTriangle, saude: Syringe };
+const iconFor = {
+  parto: Baby, preparto: Baby, secagem: Milk, diagnostico: Stethoscope,
+  cio: HeartPulse, carencia: AlertTriangle, saude: Syringe,
+};
 
 export default function QuadroDoDia({ alerts }) {
   return (
@@ -20,12 +23,12 @@ export default function QuadroDoDia({ alerts }) {
       </div>
 
       {alerts.length === 0 ? (
-        <p style={{ color: "#DCE5D6" }} className="text-sm">Nenhum alerta de cio, parto, carência ou vacina para os próximos dias. 🌱</p>
+        <p style={{ color: "#DCE5D6" }} className="text-sm">Nenhum alerta de reprodução, carência ou vacina para os próximos dias. 🌱</p>
       ) : (
         <div className="flex flex-col gap-2">
           {alerts.map((al) => {
-            const cfg = urgCfg[al.urgencia];
-            const Icon = iconFor[al.icone];
+            const cfg = urgCfg[al.urgencia] || urgCfg.proximo;
+            const Icon = iconFor[al.icone] || AlertTriangle;
             return (
               <div key={al.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ backgroundColor: "#ffffff12" }}>
                 <span className="flex items-center justify-center rounded-full shrink-0" style={{ backgroundColor: cfg.bg, width: 32, height: 32 }}>

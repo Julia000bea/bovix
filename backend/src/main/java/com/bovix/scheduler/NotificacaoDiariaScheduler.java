@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
@@ -32,12 +33,13 @@ public class NotificacaoDiariaScheduler {
     private final ConfiguracaoRepository configuracaoRepository;
     private final PainelDoDiaService painelDoDiaService;
     private final EmailService emailService;
+    private final Clock clock; // fuso da fazenda (bovix.fuso-horario), não o UTC do servidor
 
     @Scheduled(cron = "0 */10 * * * *")
     @Transactional
     public void verificarEEnviar() {
-        LocalDate hoje = LocalDate.now();
-        LocalTime agora = LocalTime.now();
+        LocalDate hoje = LocalDate.now(clock);
+        LocalTime agora = LocalTime.now(clock);
 
         List<Configuracao> configs = configuracaoRepository.findByNotificacaoAtivaTrue();
         for (Configuracao config : configs) {
@@ -49,7 +51,7 @@ public class NotificacaoDiariaScheduler {
                 long diferencaMinutos = Math.abs(ChronoUnit.MINUTES.between(horario, agora));
                 if (diferencaMinutos > JANELA_MINUTOS) continue; // ainda não chegou a janela de hoje
 
-                List<AlertaDoDia> alertas = painelDoDiaService.calcularAlertas(config.getFazendaId());
+                List<AlertaDoDia> alertas = painelDoDiaService.calcularAlertasDaFazenda(config.getFazendaId());
                 String nomeFazenda = config.getFazenda().getNome();
                 emailService.enviarQuadroDoDia(config.getNotificacaoEmail(), nomeFazenda, alertas);
 
@@ -57,7 +59,7 @@ public class NotificacaoDiariaScheduler {
                 configuracaoRepository.save(config);
                 log.info("Relatório diário enviado — fazenda {}", config.getFazendaId());
             } catch (Exception e) {
-                log.error("Falha ao enviar relatório diário da fazenda {}: {}", config.getFazendaId(), e.getMessage());
+                log.error("Falha ao enviar relatório diário da fazenda {}", config.getFazendaId(), e);
             }
         }
     }

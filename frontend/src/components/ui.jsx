@@ -23,6 +23,16 @@ export function Pill({ children, color }) {
   );
 }
 
+/** Mensagem de erro de uma ação (salvar/remover) — some quando text é vazio. */
+export function ErrorText({ text }) {
+  if (!text) return null;
+  return (
+    <p className="text-xs rounded-lg px-3 py-2" style={{ color: C.cio, backgroundColor: C.cio + "12", ...fBody }} role="alert">
+      {text}
+    </p>
+  );
+}
+
 export function EmptyState({ text }) {
   return (
     <div className="text-center py-10 rounded-xl border border-dashed text-sm" style={{ borderColor: C.line, color: C.inkSoft, ...fBody }}>
