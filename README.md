@@ -188,7 +188,11 @@ O Neon mudou a forma de criar conta nova: hoje passa pela Vercel.
    - `BOVIX_JWT_SECRET` (**obrigatória**: valor aleatório com pelo menos 32 bytes — sem ela a API não sobe)
    - `BOVIX_FUSO_HORARIO` (opcional, padrão `America/Sao_Paulo` — o servidor do Render roda em UTC)
    - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<host-do-neon>/<banco>?sslmode=require`
+     (sem usuário/senha na URL e sem `channel_binding` — esse parâmetro é da libpq, não do driver JDBC)
    - `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` (do Neon)
+   - Alternativa: colar a string do Neon como veio (`postgresql://usuario:senha@host/banco?...`) em
+     `DATABASE_URL` (ou em `SPRING_DATASOURCE_URL`) — a API converte sozinha para o formato JDBC.
+   - `PORT` não precisa ser criada: o Render define e a API usa automaticamente.
    - `BOVIX_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` (se for usar o relatório por e-mail)
 5. Plano: escolha "Free". Deploy.
 6. Quando terminar, o Render te dá uma URL tipo `https://bovix-api.onrender.com` — é essa URL

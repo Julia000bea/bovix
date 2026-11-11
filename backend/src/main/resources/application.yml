@@ -1,5 +1,6 @@
 server:
-  port: 8080
+  # o Render informa a porta pela variável PORT
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -8,10 +9,15 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
   datasource:
-    # porta 5433 (não 5432) para não conflitar com um PostgreSQL nativo instalado na máquina
-    url: jdbc:postgresql://localhost:5433/bovix
-    username: bovix
-    password: bovix
+    # Produção: defina SPRING_DATASOURCE_URL (jdbc:postgresql://<host>/<banco>?sslmode=require),
+    # SPRING_DATASOURCE_USERNAME e SPRING_DATASOURCE_PASSWORD. A URL do Neon no formato
+    # postgresql://usuario:senha@host/banco também é aceita (ou via DATABASE_URL) e convertida por
+    # DatabaseUrlEnvironmentPostProcessor.
+    # Os valores padrão abaixo são só os do Postgres LOCAL do docker-compose (porta 5433, para não
+    # conflitar com um PostgreSQL nativo) — não são credenciais de nenhum ambiente real.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/bovix}
+    username: ${SPRING_DATASOURCE_USERNAME:bovix}
+    password: ${SPRING_DATASOURCE_PASSWORD:bovix}
   jpa:
     hibernate:
       ddl-auto: validate   # o schema é criado pelo Flyway, nunca pelo Hibernate

@@ -19,7 +19,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
  * Segurança da API: stateless (sem sessão/cookies), autenticação via JWT no header Authorization.
- * /api/auth/** fica público (login/registro); todo o resto exige token válido.
+ * Só POST /api/auth/login e /api/auth/registrar são públicos; todo o resto (inclusive /api/auth/me) exige token válido.
  * CORS é aplicado aqui (via CorsConfig.corsConfigurationSource) e as requisições OPTIONS
  * de preflight são liberadas explicitamente — senão o navegador bloqueia toda chamada
  * com JSON ou com o header Authorization antes mesmo dela chegar no controller.
@@ -49,7 +49,8 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
+                // só login e registro são públicos; /api/auth/me exige token (sem ele → 401)
+                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/registrar").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .anyRequest().authenticated()
             )
