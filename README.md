@@ -156,10 +156,25 @@ só com código, precisa de conta própria nesse provedor. A arquitetura já sep
 quadro do dia" (`PainelDoDiaService`) de "enviar" (`EmailService`), então dá pra adicionar um
 `WhatsAppService` do mesmo jeito no futuro, se você abrir uma conta em algum desses provedores.
 
-## Upload de foto do animal
+## Foto do animal
 
-Backend salva em disco (`bovix.uploads-dir`) e expõe em `/uploads/animais/<arquivo>`.
-Para produção, troque por um bucket (S3, GCS, etc.) em `AnimalService.salvarFoto`.
+O navegador reduz a foto antes de enviar (lado maior de 1280 px, JPEG ~150–400 KB) e a API guarda
+no próprio PostgreSQL (tabela `animal_fotos`). A foto é servida em `/api/fotos/<chave>`, onde a chave
+é aleatória e muda a cada novo envio.
+
+Por que no banco e não no disco: no Render (e na maioria das hospedagens de container) o disco é
+apagado a cada deploy, reinício ou quando o serviço "dorme". Com fotos pequenas, 100 animais ocupam
+cerca de 30 MB — folgado no 1 GB do plano grátis do Neon. Fotos enviadas antes desta versão
+(em `/uploads/animais/...`) continuam sendo servidas enquanto existirem no disco.
+
+## Esqueci minha senha
+
+Na tela de login, "Esqueci minha senha" envia um link de uso único que vale por 1 hora
+(no máximo 3 pedidos por e-mail por hora). Ao trocar a senha, os logins abertos em outros
+aparelhos deixam de valer. Precisa de:
+- SMTP configurado (mesmas variáveis do relatório diário);
+- `BOVIX_FRONTEND_URL` com o endereço público do frontend (ex.: `https://bovix.vercel.app`),
+  que é usado para montar o link do e-mail.
 
 ---
 
@@ -193,7 +208,10 @@ O Neon mudou a forma de criar conta nova: hoje passa pela Vercel.
    - Alternativa: colar a string do Neon como veio (`postgresql://usuario:senha@host/banco?...`) em
      `DATABASE_URL` (ou em `SPRING_DATASOURCE_URL`) — a API converte sozinha para o formato JDBC.
    - `PORT` não precisa ser criada: o Render define e a API usa automaticamente.
-   - `BOVIX_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` (se for usar o relatório por e-mail)
+   - `BOVIX_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` (relatório diário e "esqueci minha senha")
+   - `BOVIX_FRONTEND_URL` = URL do frontend na Vercel (usada no link de redefinição de senha)
+   - `BOVIX_CORS_ALLOWED_ORIGINS` = a mesma URL do frontend
+   - Em "Health Check Path", coloque `/api/health` (não consulta o banco)
 5. Plano: escolha "Free". Deploy.
 6. Quando terminar, o Render te dá uma URL tipo `https://bovix-api.onrender.com` — é essa URL
    + `/api` que vai entrar no `VITE_API_URL` do frontend.
@@ -234,8 +252,9 @@ que só você pode tomar/criar. Aqui está o roteiro, na ordem:
 - Configurar HTTPS (a maioria dos PaaS já entrega isso automaticamente).
 
 ### 4. Armazenamento das fotos
-- Em produção, disco local do servidor é arriscado (some se o container reiniciar/escalar).
-- Trocar por um bucket S3 (ou Cloudflare R2/GCS) é a mudança recomendada — altera só o método `salvarFoto` no `AnimalService`, o resto do sistema não muda.
+- Resolvido: as fotos ficam no PostgreSQL (ver "Foto do animal"), então não dependem do disco do servidor.
+- Se um dia o volume crescer muito (milhares de animais), dá para mover para um bucket (Cloudflare R2, S3)
+  trocando só o `AnimalFotoRepository`.
 
 ### 5. Deploy do frontend
 - Buildar: `npm run build` gera a pasta `frontend/dist` (arquivos estáticos).
@@ -251,15 +270,48 @@ que só você pode tomar/criar. Aqui está o roteiro, na ordem:
 - [ ] Senha do banco forte, banco não exposto publicamente sem necessidade.
 - [ ] HTTPS ativo em backend e frontend.
 - [ ] CORS restrito só ao domínio do seu frontend (não `*`).
-- [ ] Limite de tamanho de upload de foto configurado (`spring.servlet.multipart.max-file-size`) para evitar abuso.
-- [ ] Rate limiting básico nas rotas de login/registro (evita força bruta) — pode ser no próprio Nginx/Cloudflare na frente da API.
+- [x] Limite de tamanho de upload de foto (5 MB na requisição, 3 MB por foto).
+- [x] Limite de tentativas de login por e-mail (5 erros em 15 min) e limite de e-mails de teste/redefinição.
+- [ ] Limite por IP no registro de contas — se aparecer abuso, coloque o Cloudflare na frente da API.
 - [ ] Backup do banco testado (não só configurado — teste restaurar uma vez).
 
 ### 8. Antes de vender/lançar de verdade
-- Recuperação de senha ("esqueci minha senha") — hoje não existe, só login/registro.
+- [x] Recuperação de senha ("esqueci minha senha").
 - Verificação de e-mail no cadastro.
 - Monitoramento de erros (Sentry) e logs centralizados.
 - Testes automatizados mínimos nos fluxos críticos (login, criar animal, registrar parto).
 
 Nenhum desses passos precisa ser feito hoje para você testar o sistema — só são obrigatórios
 antes de colocar dados reais de produção e usuários de verdade nele.
+
+---
+
+## Rodando numa fazenda de verdade (recomendado)
+
+O deploy 100% grátis acima serve para testar. Para uma fazenda depender do sistema todo dia:
+
+| Peça | Recomendação | Custo |
+|---|---|---|
+| Frontend | Vercel (plano grátis) | R$ 0 |
+| API | Render **Starter** (não dorme) | US$ 7/mês |
+| Banco | Neon Free (1 GB, desliga sozinho quando ninguém usa) | R$ 0 |
+| E-mail | Brevo SMTP grátis (300 e-mails/dia) no lugar do Gmail | R$ 0 |
+| Monitoramento | cron-job.org ou UptimeRobot chamando `/api/health` | R$ 0 |
+
+Por que pagar a API: no plano grátis ela dorme após 15 min sem uso, o primeiro acesso demora
+até 1 minuto e o Render pode reiniciá-la a qualquer momento. O Starter roda direto.
+
+**Se precisar ficar no grátis por enquanto:** configure no cron-job.org uma chamada a
+`https://<sua-api>.onrender.com/api/health` a cada 10 minutos. Isso mantém a API acordada
+(cabe nas 750 horas grátis do mês para **um** serviço) sem manter o banco ligado, porque
+`/api/health` não consulta o banco.
+
+**E-mail:** crie conta no Brevo, valide um remetente (ex.: o e-mail da fazenda) e use em
+`BOVIX_SMTP_HOST=smtp-relay.brevo.com`, `BOVIX_SMTP_PORT=587` e o usuário/senha SMTP que o
+Brevo mostra. Assim o relatório diário e o "esqueci minha senha" não dependem da sua conta pessoal do Gmail.
+
+**Backup:** o Neon guarda um histórico curto. Faça também um `pg_dump` semanal guardado fora do
+Neon (ex.: GitHub Actions agendado salvando o arquivo num Google Drive) e teste restaurar uma vez.
+
+**No campo:** o sistema precisa de internet. Antes de levar para a fazenda, teste no celular,
+no curral, com o sinal que existe lá.

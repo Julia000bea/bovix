@@ -8,6 +8,10 @@ export function useAuth() {
   const [erro, setErro] = useState(null);
 
   const restaurarSessao = useCallback(async () => {
+    // abriu o link de "esqueci minha senha": sai da sessão atual para mostrar a tela de nova senha
+    if ((window.location.hash || "").startsWith("#redefinir=")) {
+      authStorage.clear();
+    }
     if (!authStorage.getToken()) {
       setCarregando(false);
       return;

@@ -4,6 +4,7 @@ import com.bovix.dto.ConfiguracaoRequest;
 import com.bovix.model.Configuracao;
 import com.bovix.model.Fazenda;
 import com.bovix.repository.ConfiguracaoRepository;
+import com.bovix.scheduler.NotificacaoDiariaScheduler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ public class ConfiguracaoService {
 
     private final ConfiguracaoRepository repository;
     private final FazendaService fazendaService;
+    private final NotificacaoDiariaScheduler notificacaoScheduler;
 
     public Configuracao buscarOuCriar(Long fazendaId) {
         Fazenda fazenda = fazendaService.verificarPropriedade(fazendaId);
@@ -37,6 +39,8 @@ public class ConfiguracaoService {
                 && (config.getNotificacaoEmail() == null || config.getNotificacaoEmail().isBlank())) {
             throw new RegraNegocioException("Informe o e-mail de destino para ativar o relatório diário.");
         }
-        return repository.save(config);
+        Configuracao salva = repository.save(config);
+        notificacaoScheduler.agendarNovaVerificacao(); // horário/e-mail podem ter mudado
+        return salva;
     }
 }

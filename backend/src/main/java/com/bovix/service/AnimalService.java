@@ -2,19 +2,18 @@ package com.bovix.service;
 
 import com.bovix.model.Animal;
 import com.bovix.model.Fazenda;
+import com.bovix.repository.AnimalFotoRepository;
 import com.bovix.repository.AnimalRepository;
 import com.bovix.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.*;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -22,15 +21,12 @@ import java.util.UUID;
 public class AnimalService {
 
     private final AnimalRepository animalRepository;
+    private final AnimalFotoRepository animalFotoRepository;
     private final FazendaService fazendaService;
 
-    private static final Map<String, String> EXTENSAO_POR_TIPO = Map.of(
-            "image/jpeg", ".jpg",
-            "image/png", ".png",
-            "image/webp", ".webp");
-
-    @Value("${bovix.uploads-dir}")
-    private String uploadsDir;
+    private static final Set<String> TIPOS_IMAGEM = Set.of("image/jpeg", "image/png", "image/webp");
+    // o frontend reduz a foto antes de enviar; isto só barra arquivos que não passaram por ele
+    private static final long TAMANHO_MAXIMO_FOTO = 3L * 1024 * 1024;
 
     public List<Animal> listarPorFazenda(Long fazendaId) {
         fazendaService.verificarPropriedade(fazendaId);
@@ -67,24 +63,30 @@ public class AnimalService {
         animalRepository.deleteById(id);
     }
 
-    /** Salva a foto enviada em disco e associa a URL pública ao animal. */
+    /**
+     * Salva a foto no banco (tabela animal_fotos) e associa ao animal a URL pública /api/fotos/{chave}.
+     * Não usa o disco do servidor: em hospedagens como o Render ele é apagado a cada deploy/reinício.
+     */
+    @Transactional
     public Animal salvarFoto(Long id, MultipartFile arquivo) throws IOException {
         Animal animal = buscar(id); // já valida propriedade
 
-        // extensão vem do tipo validado, nunca do nome enviado — evita hospedar .html/.svg com script
-        String extensao = arquivo.isEmpty() ? null : EXTENSAO_POR_TIPO.get(arquivo.getContentType());
-        if (extensao == null || !assinaturaDeImagem(arquivo)) {
+        String tipo = arquivo.getContentType();
+        if (arquivo.isEmpty() || tipo == null || !TIPOS_IMAGEM.contains(tipo)) {
+            throw new RegraNegocioException("Envie uma imagem JPG, PNG ou WEBP.");
+        }
+        if (arquivo.getSize() > TAMANHO_MAXIMO_FOTO) {
+            throw new RegraNegocioException("Foto muito grande (máximo 3 MB).");
+        }
+        byte[] conteudo = arquivo.getBytes();
+        if (!assinaturaDeImagem(conteudo)) {
             throw new RegraNegocioException("Envie uma imagem JPG, PNG ou WEBP.");
         }
 
-        Path pasta = Paths.get(uploadsDir);
-        Files.createDirectories(pasta);
+        String chave = UUID.randomUUID().toString();
+        animalFotoRepository.salvar(animal.getId(), chave, tipo, conteudo);
 
-        String nomeArquivo = UUID.randomUUID() + extensao;
-        Path destino = pasta.resolve(nomeArquivo);
-        Files.copy(arquivo.getInputStream(), destino, StandardCopyOption.REPLACE_EXISTING);
-
-        animal.setFotoUrl("/uploads/animais/" + nomeArquivo);
+        animal.setFotoUrl("/api/fotos/" + chave);
         return animalRepository.save(animal);
     }
 
@@ -99,12 +101,8 @@ public class AnimalService {
     }
 
     /** Confere os primeiros bytes (JPEG, PNG ou WEBP) — o content-type sozinho é informado pelo cliente. */
-    private boolean assinaturaDeImagem(MultipartFile arquivo) throws IOException {
-        byte[] b = new byte[12];
-        int lidos;
-        try (InputStream in = arquivo.getInputStream()) {
-            lidos = in.readNBytes(b, 0, b.length);
-        }
+    private boolean assinaturaDeImagem(byte[] b) {
+        int lidos = b.length;
         if (lidos >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) return true; // JPEG
         if (lidos >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') return true;      // PNG
         return lidos >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'

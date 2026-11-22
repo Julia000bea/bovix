@@ -91,7 +91,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> tratarUploadGrande(MaxUploadSizeExceededException e) {
-        return erro(HttpStatus.PAYLOAD_TOO_LARGE, "Arquivo muito grande (máximo 10 MB).");
+        return erro(HttpStatus.PAYLOAD_TOO_LARGE, "Arquivo muito grande (máximo 5 MB).");
     }
 
     @ExceptionHandler(MultipartException.class)

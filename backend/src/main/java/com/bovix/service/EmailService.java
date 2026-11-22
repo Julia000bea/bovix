@@ -32,6 +32,20 @@ public class EmailService {
         mailSender.send(mensagem);
     }
 
+    public void enviarRedefinicaoSenha(String destino, String nome, String link) {
+        SimpleMailMessage mensagem = new SimpleMailMessage();
+        mensagem.setFrom(remetente);
+        mensagem.setTo(destino);
+        mensagem.setSubject("Bovix — Redefinição de senha");
+        mensagem.setText("Olá" + (nome != null && !nome.isBlank() ? ", " + nome : "") + "!\n\n"
+                + "Recebemos um pedido para redefinir a senha da sua conta no Bovix.\n"
+                + "Para criar uma nova senha, abra o link abaixo (vale por 1 hora e só pode ser usado uma vez):\n\n"
+                + link + "\n\n"
+                + "Se não foi você, ignore este e-mail: sua senha continua a mesma.\n\n"
+                + "--\nEnviado automaticamente pelo Bovix.");
+        mailSender.send(mensagem);
+    }
+
     private String montarCorpo(String nomeFazenda, List<AlertaDoDia> alertas) {
         StringBuilder sb = new StringBuilder();
         sb.append("Bom dia! Aqui está o quadro do dia da ").append(nomeFazenda).append(":\n\n");

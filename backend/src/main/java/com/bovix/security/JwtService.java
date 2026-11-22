@@ -52,11 +52,19 @@ public class JwtService {
                 .compact();
     }
 
-    /** Retorna o id do usuário (claim "uid") se o token for válido, ou lança exceção. */
-    public Long validarEExtrairUsuarioId(String token) {
+    /** Dados de um token válido: id do usuário (claim "uid") e quando foi emitido. */
+    public record TokenValido(Long usuarioId, Date emitidoEm) {}
+
+    /** Valida assinatura e expiração; lança exceção se o token for inválido. */
+    public TokenValido validar(String token) {
         var claims = Jwts.parser().verifyWith(chave).build().parseSignedClaims(token).getPayload();
         Object uid = claims.get("uid");
-        if (uid instanceof Number numero) return numero.longValue();
-        return Long.valueOf(String.valueOf(uid));
+        Long usuarioId = uid instanceof Number numero ? numero.longValue() : Long.valueOf(String.valueOf(uid));
+        return new TokenValido(usuarioId, claims.getIssuedAt());
+    }
+
+    /** Retorna o id do usuário (claim "uid") se o token for válido, ou lança exceção. */
+    public Long validarEExtrairUsuarioId(String token) {
+        return validar(token).usuarioId();
     }
 }

@@ -12,17 +12,32 @@ const iconFor = {
   cio: HeartPulse, carencia: AlertTriangle, saude: Syringe,
 };
 
-export default function QuadroDoDia({ alerts }) {
+export default function QuadroDoDia({ alerts, carregando = false, erro = null, onTentarDeNovo }) {
+  const semDados = erro || (carregando && alerts.length === 0);
   return (
     <div className="rounded-2xl p-5 sm:p-6" style={{ background: `linear-gradient(155deg, ${C.pasto900} 0%, ${C.pasto700} 100%)` }}>
       <div className="flex items-center justify-between mb-4">
         <h2 style={{ ...fDisplay, color: C.pasto50, fontWeight: 700 }} className="text-lg sm:text-xl">Quadro do dia</h2>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#C9D3C4" }} className="text-xs">
-          {alerts.length === 0 ? "tudo em dia" : `${alerts.length} pendência(s)`}
+          {erro ? "indisponível" : semDados ? "carregando…" : alerts.length === 0 ? "tudo em dia" : `${alerts.length} pendência(s)`}
         </span>
       </div>
 
-      {alerts.length === 0 ? (
+      {erro ? (
+        <div className="rounded-lg px-3 py-3" style={{ backgroundColor: "#5C231D" }}>
+          <p style={{ color: "#F6E4DD" }} className="text-sm font-semibold">Não foi possível carregar os alertas de hoje.</p>
+          <p style={{ color: "#F6E4DD" }} className="text-xs mt-1">
+            Isso não quer dizer que está tudo em dia: confira carências e partos nas abas Saúde e Reprodução. ({erro})
+          </p>
+          {onTentarDeNovo && (
+            <button onClick={onTentarDeNovo} className="mt-2 px-3 py-1.5 rounded-md text-xs font-semibold" style={{ backgroundColor: "#F6E4DD", color: "#5C231D" }}>
+              Tentar de novo
+            </button>
+          )}
+        </div>
+      ) : semDados ? (
+        <p style={{ color: "#DCE5D6" }} className="text-sm">Carregando os alertas de hoje…</p>
+      ) : alerts.length === 0 ? (
         <p style={{ color: "#DCE5D6" }} className="text-sm">Nenhum alerta de reprodução, carência ou vacina para os próximos dias. 🌱</p>
       ) : (
         <div className="flex flex-col gap-2">
