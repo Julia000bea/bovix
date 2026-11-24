@@ -203,12 +203,16 @@ public class PainelDoDiaService {
 
     private void alertasSaude(Animal animal, List<EventoSaude> eventos, LocalDate hoje, List<AlertaDoDia> alertas) {
         for (EventoSaude e : eventos) {
-            if (e.getCarenciaLeiteDias() != null && e.getCarenciaLeiteDias() > 0) {
-                LocalDate fim = e.getData().plusDays(e.getCarenciaLeiteDias());
-                if (!hoje.isAfter(fim)) {
-                    alertas.add(alerta("carencia-" + e.getId(), animal, "carencia", "ativo", null,
-                            "Leite em carência até " + formatar(fim) + " (" + e.getProduto() + ")"));
-                }
+            // a carência conta a partir da ÚLTIMA aplicação do tratamento (ver EventoSaude.getFimCarencia)
+            LocalDate fim = e.getFimCarencia();
+            if (fim != null && !hoje.isAfter(fim)) {
+                LocalDate ultimaAplicacao = e.getDataUltimaAplicacao();
+                String tratamento = ultimaAplicacao.isAfter(e.getData())
+                        ? "; tratamento até " + formatar(ultimaAplicacao)
+                        : "";
+                alertas.add(alerta("carencia-" + e.getId(), animal, "carencia", "ativo",
+                        ChronoUnit.DAYS.between(hoje, fim),
+                        "Leite em carência até " + formatar(fim) + " — descartar o leite (" + e.getProduto() + tratamento + ")"));
             }
         }
 

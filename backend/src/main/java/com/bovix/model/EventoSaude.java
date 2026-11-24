@@ -41,6 +41,13 @@ public class EventoSaude {
     @Column(name = "carencia_leite_dias")
     private Integer carenciaLeiteDias;
 
+    // Tratamento de vários dias (ex.: 3 dias de antibiótico): a carência conta a partir da
+    // última aplicação, que é data + (duração - 1). Vazio = dose única.
+    @Min(value = 1, message = "deve ser de pelo menos 1 dia")
+    @Max(value = 60, message = "deve ser de no máximo 60 dias")
+    @Column(name = "duracao_tratamento_dias", nullable = false)
+    private Integer duracaoTratamentoDias;
+
     @Positive
     @Column(name = "proxima_aplicacao_dias")
     private Integer proximaAplicacaoDias;
@@ -54,6 +61,24 @@ public class EventoSaude {
     @PrePersist
     void prePersist() {
         if (criadoEm == null) criadoEm = LocalDateTime.now();
+        if (duracaoTratamentoDias == null) duracaoTratamentoDias = 1;
+    }
+
+    /** Data da última aplicação do tratamento (igual a data, na dose única). */
+    @Transient
+    @JsonIgnore
+    public LocalDate getDataUltimaAplicacao() {
+        if (data == null) return null;
+        int duracao = duracaoTratamentoDias != null && duracaoTratamentoDias > 1 ? duracaoTratamentoDias : 1;
+        return data.plusDays(duracao - 1L);
+    }
+
+    /** Último dia em que o leite ainda está em carência (inclusive), ou null se não há carência. */
+    @Transient
+    @JsonProperty("fimCarencia")
+    public LocalDate getFimCarencia() {
+        if (data == null || carenciaLeiteDias == null || carenciaLeiteDias <= 0) return null;
+        return getDataUltimaAplicacao().plusDays(carenciaLeiteDias);
     }
 
     @Transient

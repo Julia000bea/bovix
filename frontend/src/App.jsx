@@ -39,7 +39,8 @@ function AppLogado({ auth }) {
   const [tab, setTab] = useState("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const alerts = useAlerts(farm);
+  const quadro = useAlerts(farm);
+  const alerts = quadro.alertas;
   const insights = useInsights(farm, alerts);
 
   if (farm.loading) {
@@ -78,7 +79,7 @@ function AppLogado({ auth }) {
       <TabNav tab={tab} setTab={setTab} alertCount={alerts.length} />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-        {tab === "dashboard" && <Dashboard data={farm} alerts={alerts} insights={insights} setTab={setTab} />}
+        {tab === "dashboard" && <Dashboard data={farm} alerts={alerts} quadro={quadro} insights={insights} setTab={setTab} />}
         {tab === "rebanho" && <Rebanho data={farm} />}
         {tab === "reproducao" && <Reproducao data={farm} />}
         {tab === "saude" && <Saude data={farm} />}

@@ -7,6 +7,7 @@ import com.bovix.model.Fazenda;
 import com.bovix.service.ConfiguracaoService;
 import com.bovix.service.EmailService;
 import com.bovix.service.FazendaService;
+import com.bovix.service.LimiteEnvios;
 import com.bovix.service.PainelDoDiaService;
 import com.bovix.service.RegraNegocioException;
 import jakarta.validation.Valid;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,7 @@ public class ConfiguracaoController {
     private final FazendaService fazendaService;
     private final PainelDoDiaService painelDoDiaService;
     private final EmailService emailService;
+    private final LimiteEnvios limiteEnvios;
 
     @GetMapping
     public Configuracao buscar(@PathVariable Long fazendaId) {
@@ -43,6 +46,10 @@ public class ConfiguracaoController {
         Configuracao config = service.buscarOuCriar(fazendaId);
         if (config.getNotificacaoEmail() == null || config.getNotificacaoEmail().isBlank()) {
             throw new RegraNegocioException("Cadastre e salve um e-mail de notificação antes de testar.");
+        }
+        // o destino é livre, então o botão não pode virar disparador de spam pela conta SMTP
+        if (!limiteEnvios.permitir("teste-notificacao:" + fazendaId, 5, Duration.ofHours(1))) {
+            throw new RegraNegocioException("Limite de 5 e-mails de teste por hora atingido. Tente mais tarde.");
         }
         Fazenda fazenda = fazendaService.verificarPropriedade(fazendaId);
         List<AlertaDoDia> alertas = painelDoDiaService.calcularAlertas(fazendaId);

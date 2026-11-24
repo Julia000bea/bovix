@@ -1,6 +1,7 @@
 package com.bovix.security;
 
 import com.bovix.model.Usuario;
+import com.bovix.repository.RedefinicaoSenhaRepository;
 import com.bovix.repository.UsuarioRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,6 +27,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UsuarioRepository usuarioRepository;
+    private final RedefinicaoSenhaRepository redefinicaoSenhaRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -36,9 +38,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
             try {
-                Long usuarioId = jwtService.validarEExtrairUsuarioId(token);
-                Usuario usuario = usuarioRepository.findById(usuarioId).orElse(null);
-                if (usuario != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                JwtService.TokenValido valido = jwtService.validar(token);
+                Usuario usuario = usuarioRepository.findById(valido.usuarioId()).orElse(null);
+                if (usuario != null && SecurityContextHolder.getContext().getAuthentication() == null
+                        && !emitidoAntesDaTrocaDeSenha(valido)) {
                     var auth = new UsernamePasswordAuthenticationToken(usuario, null, List.of());
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
@@ -48,5 +51,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /** Depois de redefinir a senha, os logins feitos antes (em qualquer aparelho) deixam de valer. */
+    private boolean emitidoAntesDaTrocaDeSenha(JwtService.TokenValido token) {
+        Long alteradaEm = redefinicaoSenhaRepository.senhaAlteradaEm(token.usuarioId());
+        if (alteradaEm == null || token.emitidoEm() == null) return false;
+        // o JWT guarda a emissão em segundos: compara na mesma precisão
+        return token.emitidoEm().getTime() / 1000 < alteradaEm / 1000;
     }
 }

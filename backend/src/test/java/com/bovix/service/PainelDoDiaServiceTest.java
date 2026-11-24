@@ -218,6 +218,27 @@ class PainelDoDiaServiceTest {
     }
 
     @Test
+    void carenciaDeTratamentoDeVariosDiasContaDaUltimaAplicacao() {
+        // 1ª dose há 5 dias, 3 dias de tratamento (última dose há 3 dias), carência de 4 dias:
+        // contando da 1ª dose já teria acabado ontem; contando da última, vai até daqui a 1 dia.
+        saude.add(EventoSaude.builder().id(proximoId++).animal(vaca).tipo("medicamento").produto("Antibiótico")
+                .data(HOJE.minusDays(5)).duracaoTratamentoDias(3).carenciaLeiteDias(4).build());
+
+        assertThat(service.calcularAlertasDaFazenda(FAZENDA)).singleElement().satisfies(a -> {
+            assertThat(a.getTipo()).isEqualTo("carencia");
+            assertThat(a.getDias()).isEqualTo(1L);
+            assertThat(a.getTexto()).contains("29/10/2026").contains("tratamento até 25/10/2026");
+        });
+    }
+
+    @Test
+    void carenciaZeradaNaoGeraAlerta() {
+        saude("Vermífugo", 0, 0, null);
+
+        assertThat(service.calcularAlertasDaFazenda(FAZENDA)).isEmpty();
+    }
+
+    @Test
     void animalInativoNaoGeraAlertas() {
         vaca.setStatus("Vendida");
         repro("cio_detectado", 20);

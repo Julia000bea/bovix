@@ -62,8 +62,14 @@ export default function Saude({ data }) {
             </select>
           </Field>
           <Field label="Produto / medicamento *"><input className={inputCls} style={inputStyle} value={form.produto} onChange={(e) => setForm({ ...form, produto: e.target.value })} /></Field>
-          <Field label="Data da aplicação"><input type="date" className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
-          <Field label="Carência do leite (dias)"><input type="number" min="0" className={inputCls} style={inputStyle} value={form.carenciaLeiteDias} onChange={(e) => setForm({ ...form, carenciaLeiteDias: e.target.value })} placeholder="ex: 4" /></Field>
+          <Field label="Data da 1ª aplicação"><input type="date" className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
+          <Field label="Dias de tratamento"><input type="number" min="1" max="60" className={inputCls} style={inputStyle} value={form.duracaoTratamentoDias} onChange={(e) => setForm({ ...form, duracaoTratamentoDias: e.target.value })} placeholder="1 (dose única)" /></Field>
+          <div>
+            <Field label="Carência do leite (dias)"><input type="number" min="0" className={inputCls} style={inputStyle} value={form.carenciaLeiteDias} onChange={(e) => setForm({ ...form, carenciaLeiteDias: e.target.value })} placeholder="ex: 4" /></Field>
+            <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
+              Conta a partir da última aplicação. Se a bula informa em horas, divida por 24 e arredonde para cima (ex.: 60 h = 3 dias).
+            </p>
+          </div>
           <Field label="Repetir aplicação em (dias)"><input type="number" min="1" className={inputCls} style={inputStyle} value={form.proximaAplicacaoDias} onChange={(e) => setForm({ ...form, proximaAplicacaoDias: e.target.value })} placeholder="ex: 365 (anual)" /></Field>
           <div className="sm:col-span-2">
             <Field label="Observações"><input className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></Field>
@@ -90,7 +96,9 @@ export default function Saude({ data }) {
                 <p className="text-sm font-medium" style={{ color: C.ink }}>{e.produto} — {rotuloAnimal(animais.find((a) => a.id === e.animalId))}</p>
                 <p className="text-xs" style={{ color: C.inkSoft }}>
                   {formatDate(e.data)} · {TIPOS_SAUDE.find((t) => t.v === e.tipo)?.l}
-                  {e.carenciaLeiteDias && ` · carência ${e.carenciaLeiteDias}d`}
+                  {e.duracaoTratamentoDias > 1 && ` · ${e.duracaoTratamentoDias} dias de tratamento`}
+                  {e.carenciaLeiteDias > 0 && ` · carência ${e.carenciaLeiteDias}d`}
+                  {e.fimCarencia && ` (leite liberado após ${formatDate(e.fimCarencia)})`}
                   {e.observacoes && ` · ${e.observacoes}`}
                 </p>
               </div>

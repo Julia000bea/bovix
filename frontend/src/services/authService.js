@@ -16,6 +16,8 @@ export const authService = {
     if (resp) aplicarSessao(resp, false);
     return resp;
   },
+  esqueciSenha: (email) => api.post("/auth/esqueci-senha", { email }),
+  redefinirSenha: (token, novaSenha) => api.post("/auth/redefinir-senha", { token, novaSenha }),
   logout() {
     authStorage.clear();
   },

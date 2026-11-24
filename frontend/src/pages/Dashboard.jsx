@@ -4,7 +4,7 @@ import { C } from "../utils/tokens";
 import { todayStr } from "../utils/date";
 import { litrosPorDia } from "../utils/producao";
 
-export default function Dashboard({ data, alerts, insights, setTab }) {
+export default function Dashboard({ data, alerts, quadro, insights, setTab }) {
   const { animais, ordenha } = data;
   const ativos = animais.filter((a) => a.status === "Ativa");
   const lactantes = ativos.filter((a) => a.categoria === "Vaca lactante").length;
@@ -14,7 +14,7 @@ export default function Dashboard({ data, alerts, insights, setTab }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <QuadroDoDia alerts={alerts} />
+      <QuadroDoDia alerts={alerts} carregando={quadro?.carregando} erro={quadro?.erro} onTentarDeNovo={quadro?.recarregar} />
       <InsightsPanel insights={insights} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
