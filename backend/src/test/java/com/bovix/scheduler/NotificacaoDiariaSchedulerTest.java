@@ -54,7 +54,8 @@ class NotificacaoDiariaSchedulerTest {
 
         verify(emailService).enviarQuadroDoDia(eq("produtor@example.com"), eq("Sítio Boa Vista"), anyList());
         assertThat(c.getNotificacaoUltimoEnvio()).isEqualTo(HOJE);
-        assertThat(proxima).isEqualTo(HOJE.plusDays(1).atTime(7, 0).atZone(SP).toInstant());
+        // próxima envio é amanhã 07:00, mas o job confere o banco no máximo a cada 6 h (09:40 + 6 h)
+        assertThat(proxima).isEqualTo(HOJE.atTime(15, 40).atZone(SP).toInstant());
     }
 
     @Test
