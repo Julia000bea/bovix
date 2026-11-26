@@ -3,7 +3,7 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { Field, Pill, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import PhotoUpload from "../components/PhotoUpload";
 import { C, CATEGORIAS, STATUS_ANIMAL, TIPOS_REPRO, TIPOS_SAUDE, fMono } from "../utils/tokens";
-import { formatDate } from "../utils/date";
+import { formatDate, todayStr } from "../utils/date";
 import { novoAnimal } from "../models/Animal";
 import { animaisService } from "../services/animaisService";
 
@@ -65,10 +65,18 @@ export default function Rebanho({ data }) {
 
   const updateStatus = async (id, status) => {
     const atual = animais.find((a) => a.id === id);
+    let dataSaida = null;
+    if (status !== "Ativa") {
+      // a data de saída entra no histórico de vacas em lactação (indicadores)
+      const hoje = todayStr();
+      const resposta = window.prompt(`Data da ${status === "Morta" ? "morte" : "venda"} (AAAA-MM-DD):`, atual.dataSaida || hoje);
+      if (resposta === null) return;
+      dataSaida = resposta.trim() || hoje;
+    }
     setErro("");
     try {
-      const atualizado = await animaisService.atualizar(id, { ...atual, status });
-      setAnimais((prev) => prev.map((a) => (a.id === id ? { ...a, status: atualizado.status } : a)));
+      const atualizado = await animaisService.atualizar(id, { ...atual, status, dataSaida });
+      setAnimais((prev) => prev.map((a) => (a.id === id ? { ...a, status: atualizado.status, dataSaida: atualizado.dataSaida } : a)));
     } catch (e) {
       setErro(e.message || "Não foi possível alterar o status.");
     }
