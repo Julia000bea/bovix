@@ -6,6 +6,9 @@ export const C = {
   card: "#FFFFFF",
   brinco: "#DB8A2C",
   brincoDark: "#B76F1F",
+  cobre: "#A95B1B",   // botão principal da tela de login
+  creme: "#F5F0E6",   // fundo do círculo do logo
+  marca: "#3A1414",   // cor da vaca do logo
   cio: "#B0473C",
   leite: "#4C7A93",
   terra: "#6B4F3C",
@@ -14,13 +17,25 @@ export const C = {
   line: "#E1E3D8",
 };
 
-export const fDisplay = { fontFamily: "'Zilla Slab', serif" };
+// Cores das séries dos gráficos (ordem fixa; validadas para daltonismo e contraste sobre fundo branco).
+// As cores da marca (leite, brinco) ficam acinzentadas ou com pouco contraste como séries.
+export const SERIE = {
+  s1: "#2a78d6", // azul
+  s2: "#eb6834", // laranja
+  referencia: "#8a8f86",
+  grade: "#E1E3D8",
+};
+
+export const fDisplay ={ fontFamily: "'Zilla Slab', serif" };
 export const fBody = { fontFamily: "'Inter', sans-serif" };
 export const fMono = { fontFamily: "'IBM Plex Mono', monospace" };
 
 export const CATEGORIAS = ["Bezerra", "Novilha", "Vaca lactante", "Vaca seca"];
 export const STATUS_ANIMAL = ["Ativa", "Vendida", "Morta"];
 export const CATEGORIAS_GASTO = ["Ração", "Insumos", "Medicamentos", "Mão de obra", "Manutenção", "Outros"];
+export const CATEGORIAS_RECEITA = ["Venda de leite", "Outros"];
+/** Lançamentos antigos (sem tipo) são despesas. */
+export const ehDespesa = (lancamento) => (lancamento.tipo || "despesa") === "despesa";
 export const TIPOS_REPRO = [
   { v: "cio_detectado", l: "Cio detectado" },
   { v: "cio_confirmado", l: "Cio confirmado" },
@@ -31,6 +46,7 @@ export const TIPOS_REPRO = [
   { v: "secagem", l: "Secagem" },
   { v: "pre_parto", l: "Pré-parto" },
   { v: "parto", l: "Parto" },
+  { v: "perda_gestacional", l: "Perda gestacional (aborto)" },
 ];
 
 export const STATUS_REPRODUCAO = [

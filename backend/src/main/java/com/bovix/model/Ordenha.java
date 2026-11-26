@@ -43,12 +43,33 @@ public class Ordenha {
     @Column(nullable = false, precision = 8, scale = 2)
     private BigDecimal litros;
 
+    /** true = volume dividido de uma coleta de vários dias, não medido neste dia. Definido pelo servidor. */
+    @Column(nullable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Builder.Default
+    private Boolean estimado = false;
+
+    /** Quantos dias a coleta cobre (1 = medição do próprio dia). A data informada é o último dia. */
+    @Min(value = 1, message = "deve ser de pelo menos 1 dia")
+    @Max(value = 31, message = "deve ser de no máximo 31 dias")
+    @Column(name = "dias_coleta", nullable = false)
+    @Builder.Default
+    private Integer diasColeta = 1;
+
+    /** Agrupa os registros gerados por uma mesma coleta de N dias. Definido pelo servidor. */
+    @Column(name = "coleta_id", length = 36)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String coletaId;
+
     @Column(name = "criado_em", updatable = false)
     private LocalDateTime criadoEm;
 
     @PrePersist
     void prePersist() {
         if (criadoEm == null) criadoEm = LocalDateTime.now();
+        if (estimado == null) estimado = false;
+        if (diasColeta == null) diasColeta = 1;
+        if (periodo == null || periodo.isBlank()) periodo = "Dia todo";
     }
 
     @Transient

@@ -19,7 +19,7 @@ public class ReproducaoService {
 
     private static final Set<String> TIPOS_VALIDOS = Set.of(
             "cio_detectado", "cio_confirmado", "inseminacao", "reproducao",
-            "diagnostico_prenhez", "prenhez_confirmada", "secagem", "pre_parto", "parto");
+            "diagnostico_prenhez", "prenhez_confirmada", "secagem", "pre_parto", "parto", "perda_gestacional");
     private static final Set<String> TIPOS_COBERTURA = Set.of("inseminacao", "reproducao");
     private static final Set<String> TIPOS_CIO = Set.of("cio_detectado", "cio_confirmado");
     // eventos que definem a categoria do animal (lactante x seca)

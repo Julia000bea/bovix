@@ -1,4 +1,4 @@
-import { LayoutGrid, Tag, HeartPulse, Syringe, Milk, Wallet } from "lucide-react";
+import { LayoutGrid, Tag, HeartPulse, Syringe, Milk, Wallet, ClipboardList, BarChart3 } from "lucide-react";
 import { C } from "../utils/tokens";
 
 export const TABS = [
@@ -8,6 +8,8 @@ export const TABS = [
   { id: "saude", label: "Saúde", icon: Syringe },
   { id: "ordenha", label: "Ordenha", icon: Milk },
   { id: "financeiro", label: "Financeiro", icon: Wallet },
+  { id: "ocorrencias", label: "Ocorrências", icon: ClipboardList },
+  { id: "indicadores", label: "Indicadores", icon: BarChart3 },
 ];
 
 export default function TabNav({ tab, setTab, alertCount }) {

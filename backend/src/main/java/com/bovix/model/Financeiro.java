@@ -29,6 +29,11 @@ public class Financeiro {
     @Column(nullable = false)
     private LocalDate data;
 
+    /** "despesa" (padrão) ou "receita". */
+    @Column(nullable = false, length = 10)
+    @Builder.Default
+    private String tipo = "despesa";
+
     @NotBlank(message = "é obrigatória")
     @Column(nullable = false, length = 30)
     private String categoria;
@@ -47,6 +52,7 @@ public class Financeiro {
     @PrePersist
     void prePersist() {
         if (criadoEm == null) criadoEm = LocalDateTime.now();
+        if (tipo == null || tipo.isBlank()) tipo = "despesa";
     }
 
     @Transient

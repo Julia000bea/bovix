@@ -63,6 +63,12 @@ bovix:
     allowed-origins: ${BOVIX_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   # fuso usado para "hoje" (alertas, confirmação de cio, horário do e-mail) — o servidor roda em UTC
   fuso-horario: ${BOVIX_FUSO_HORARIO:America/Sao_Paulo}
+  inmet:
+    # API de dados das estações do INMET. O token é pedido ao INMET (cadastro.act@inmet.gov.br).
+    # Sem token, a busca automática fica desligada e o clima entra pela importação de CSV.
+    url: ${BOVIX_INMET_URL:https://apitempo.inmet.gov.br}
+    token: ${BOVIX_INMET_TOKEN:}
+    timeout-segundos: 20
   notificacao:
     # e-mail que aparece como remetente do relatório diário
     remetente: ${BOVIX_SMTP_USER:bovix@example.com}

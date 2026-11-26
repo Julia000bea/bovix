@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -23,6 +25,7 @@ public class AnimalService {
     private final AnimalRepository animalRepository;
     private final AnimalFotoRepository animalFotoRepository;
     private final FazendaService fazendaService;
+    private final Clock clock;
 
     private static final Set<String> TIPOS_IMAGEM = Set.of("image/jpeg", "image/png", "image/webp");
     // o frontend reduz a foto antes de enviar; isto só barra arquivos que não passaram por ele
@@ -43,6 +46,7 @@ public class AnimalService {
     public Animal criar(Long fazendaId, Animal dados) {
         Fazenda fazenda = fazendaService.verificarPropriedade(fazendaId);
         dados.setFazenda(fazenda);
+        definirDataSaida(dados, dados.getDataSaida(), null);
         return animalRepository.save(dados);
     }
 
@@ -55,7 +59,28 @@ public class AnimalService {
         existente.setCategoria(dados.getCategoria());
         existente.setStatus(dados.getStatus());
         existente.setNotas(dados.getNotas());
+        definirDataSaida(existente, dados.getDataSaida(), existente.getDataSaida());
         return animalRepository.save(existente);
+    }
+
+    /**
+     * Ativa: sem data de saída. Vendida/Morta: usa a data informada; sem ela, mantém a que já
+     * existia ou, se não havia, usa hoje (o dia em que o status foi alterado).
+     */
+    void definirDataSaida(Animal animal, LocalDate informada, LocalDate anterior) {
+        if (animal.getStatus() == null || "Ativa".equals(animal.getStatus())) {
+            animal.setDataSaida(null);
+            return;
+        }
+        LocalDate hoje = LocalDate.now(clock);
+        LocalDate data = informada != null ? informada : anterior != null ? anterior : hoje;
+        if (data.isAfter(hoje)) {
+            throw new RegraNegocioException("A data de saída não pode estar no futuro.");
+        }
+        if (animal.getNascimento() != null && data.isBefore(animal.getNascimento())) {
+            throw new RegraNegocioException("A data de saída não pode ser anterior ao nascimento.");
+        }
+        animal.setDataSaida(data);
     }
 
     public void remover(Long id) {

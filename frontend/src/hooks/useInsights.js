@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { addDays, daysBetween, todayStr } from "../utils/date";
-import { CATEGORIAS_GASTO } from "../utils/tokens";
+import { CATEGORIAS_GASTO, ehDespesa } from "../utils/tokens";
 import { litrosPorDia } from "../utils/producao";
 
 /**
@@ -76,7 +76,7 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     const mesAnterior = ultimoDiaMesAnterior.slice(0, 7);
     const limiteDiaAnterior = Math.min(diaDoMes, Number(ultimoDiaMesAnterior.slice(8, 10)));
     const totalCategoria = (mes, ateDia, categoria) =>
-      financeiro.filter((g) => g.data.slice(0, 7) === mes && Number(g.data.slice(8, 10)) <= ateDia && g.categoria === categoria)
+      financeiro.filter((g) => ehDespesa(g) && g.data.slice(0, 7) === mes && Number(g.data.slice(8, 10)) <= ateDia && g.categoria === categoria)
         .reduce((s, g) => s + Number(g.valor || 0), 0);
 
     if (diaDoMes >= 7) { // na primeira semana do mês ainda há poucos lançamentos para comparar
@@ -103,11 +103,11 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     const ativos = animais.filter((a) => a.status === "Ativa");
     for (const a of ativos) {
       const repro = reproducao.filter((e) => e.animalId === a.id).sort((x, y) => (x.data < y.data ? 1 : -1));
-      // cobertura = inseminação ou monta natural; parto, novo cio ou diagnóstico "vazia" encerram a gestação
+      // cobertura = inseminação ou monta natural; parto, novo cio, diagnóstico "vazia" ou perda gestacional encerram a gestação
       const ultimaCobertura = repro.find((e) => ["inseminacao", "reproducao"].includes(e.tipo));
       if (!ultimaCobertura) continue;
       const temEventoDepois = repro.some(
-        (e) => (e.tipo === "parto" || ["cio_detectado", "cio_confirmado"].includes(e.tipo)
+        (e) => (e.tipo === "parto" || e.tipo === "perda_gestacional" || ["cio_detectado", "cio_confirmado"].includes(e.tipo)
           || (e.tipo === "diagnostico_prenhez" && e.resultado === "vazia")) && e.data > ultimaCobertura.data
       );
       if (temEventoDepois) continue;

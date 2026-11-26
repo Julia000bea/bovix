@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Mail, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Mail, Loader2, CheckCircle2, MapPin } from "lucide-react";
 import { Field, inputCls, inputStyle } from "./ui";
 import { C } from "../utils/tokens";
 import { configService } from "../services/configService";
+import { fazendaService } from "../services/indicadoresService";
 
 export default function SettingsPanel({ config, setConfig, onClose }) {
   const [gestacao, setGestacao] = useState(config.gestacaoDias);
@@ -10,10 +11,23 @@ export default function SettingsPanel({ config, setConfig, onClose }) {
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(!!config.notificacaoAtiva);
   const [notificacaoEmail, setNotificacaoEmail] = useState(config.notificacaoEmail || "");
   const [notificacaoHorario, setNotificacaoHorario] = useState((config.notificacaoHorario || "07:00:00").slice(0, 5));
+  const [periodoSeco, setPeriodoSeco] = useState(config.periodoSecoDias ?? 60);
+  const [diasVazia, setDiasVazia] = useState(config.diasVaziaAlerta ?? 90);
+  const [local, setLocal] = useState({ latitude: "", longitude: "", estacaoInmet: "" });
+  const [localOriginal, setLocalOriginal] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testeOk, setTesteOk] = useState(false);
   const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    fazendaService.atual().then((f) => {
+      if (!f) return;
+      const l = { latitude: f.latitude ?? "", longitude: f.longitude ?? "", estacaoInmet: f.estacaoInmet ?? "" };
+      setLocal(l);
+      setLocalOriginal(l);
+    }).catch(() => setErro("Não foi possível carregar a localização da fazenda."));
+  }, []);
 
   const salvar = async () => {
     setSalvando(true);
@@ -25,7 +39,16 @@ export default function SettingsPanel({ config, setConfig, onClose }) {
         notificacaoAtiva,
         notificacaoEmail: notificacaoEmail.trim(), // "" remove o e-mail cadastrado
         notificacaoHorario: notificacaoHorario ? `${notificacaoHorario}:00` : null,
+        periodoSecoDias: Number(periodoSeco) || 60,
+        diasVaziaAlerta: Number(diasVazia) || 90,
       });
+      if (localOriginal && JSON.stringify(local) !== JSON.stringify(localOriginal)) {
+        await fazendaService.atualizarLocalizacao({
+          latitude: local.latitude === "" ? null : Number(String(local.latitude).replace(",", ".")),
+          longitude: local.longitude === "" ? null : Number(String(local.longitude).replace(",", ".")),
+          estacaoInmet: local.estacaoInmet.trim(),
+        });
+      }
       setConfig(atualizado);
       onClose();
     } catch (e) {
@@ -61,6 +84,39 @@ export default function SettingsPanel({ config, setConfig, onClose }) {
       </div>
       <p className="text-xs -mt-2" style={{ color: "#B7C2B0" }}>
         Usados para prever partos e janelas de cio. Padrão: 283 dias de gestação e ciclo de 21 dias — ajuste se sua raça tiver uma média diferente.
+      </p>
+
+      <div className="grid sm:grid-cols-3 gap-3 items-end">
+        <Field label={<span style={{ color: "#DCE5D6" }}>Período seco (dias antes do parto)</span>}>
+          <input type="number" min="30" max="120" className={inputCls} style={inputStyle} value={periodoSeco} onChange={(e) => setPeriodoSeco(e.target.value)} />
+        </Field>
+        <Field label={<span style={{ color: "#DCE5D6" }}>Alerta de vaca vazia após o parto (dias)</span>}>
+          <input type="number" min="30" max="400" className={inputCls} style={inputStyle} value={diasVazia} onChange={(e) => setDiasVazia(e.target.value)} />
+        </Field>
+      </div>
+      <p className="text-xs -mt-2" style={{ color: "#B7C2B0" }}>
+        Usados nos indicadores: data prevista da secagem (padrão 60 dias antes do parto) e vacas vazias há mais de X dias (padrão 90).
+      </p>
+
+      <div className="h-px" style={{ backgroundColor: "#ffffff20" }} />
+
+      <div className="flex items-center gap-2">
+        <MapPin size={16} color="#DCE5D6" />
+        <span className="text-sm font-semibold" style={{ color: "#DCE5D6" }}>Localização e clima</span>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-3">
+        <Field label={<span style={{ color: "#DCE5D6" }}>Latitude</span>}>
+          <input inputMode="decimal" placeholder="-15.789444" className={inputCls} style={inputStyle} value={local.latitude} onChange={(e) => setLocal({ ...local, latitude: e.target.value })} />
+        </Field>
+        <Field label={<span style={{ color: "#DCE5D6" }}>Longitude</span>}>
+          <input inputMode="decimal" placeholder="-47.925833" className={inputCls} style={inputStyle} value={local.longitude} onChange={(e) => setLocal({ ...local, longitude: e.target.value })} />
+        </Field>
+        <Field label={<span style={{ color: "#DCE5D6" }}>Estação do INMET</span>}>
+          <input maxLength={4} placeholder="ex.: A001" className={inputCls} style={inputStyle} value={local.estacaoInmet} onChange={(e) => setLocal({ ...local, estacaoInmet: e.target.value.toUpperCase() })} />
+        </Field>
+      </div>
+      <p className="text-xs -mt-2" style={{ color: "#B7C2B0" }}>
+        Use a estação automática mais próxima da fazenda (código com uma letra e três números, no mapa de estações do portal do INMET). O clima e o ITU vêm dela.
       </p>
 
       <div className="h-px" style={{ backgroundColor: "#ffffff20" }} />

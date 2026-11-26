@@ -48,6 +48,10 @@ public class Animal {
     @Column(columnDefinition = "TEXT")
     private String notas;
 
+    /** Dia da venda ou da morte. Preenchido pelo servidor ao mudar o status (ou informado pelo cliente). */
+    @Column(name = "data_saida")
+    private LocalDate dataSaida;
+
     // Definida só pelo upload (AnimalService.salvarFoto), nunca pelo JSON do cliente.
     @Column(name = "foto_url", length = 500)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
