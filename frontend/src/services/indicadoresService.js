@@ -6,6 +6,8 @@ export const indicadoresService = {
   serie: (inicio, fim) => api.get(`${base()}/indicadores/serie?inicio=${inicio}&fim=${fim}`),
   reproducao: () => api.get(`${base()}/indicadores/reproducao`),
   projecao: () => api.get(`${base()}/indicadores/projecao`),
+  exportar: (inicio, fim) =>
+    api.baixar(`${base()}/indicadores/exportar?inicio=${inicio}&fim=${fim}`, `bovix_dados_${inicio}_${fim}.csv`),
   clima: (inicio, fim) => api.get(`${base()}/clima?inicio=${inicio}&fim=${fim}`),
   importarClima: (arquivo) => {
     const fd = new FormData();

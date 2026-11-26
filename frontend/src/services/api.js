@@ -55,7 +55,36 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+/** Baixa um arquivo da API (com o token) e salva no computador. */
+async function baixar(path, nomeArquivo) {
+  const token = authStorage.getToken();
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch (error) {
+    throw new Error(`Não foi possível conectar à API (${API_URL}).`, { cause: error });
+  }
+  if (res.status === 401) {
+    authStorage.clear();
+    window.location.reload();
+    return;
+  }
+  if (!res.ok) {
+    const corpo = await res.json().catch(() => ({}));
+    throw new Error(corpo.erro || `Erro ${res.status} ao baixar o arquivo.`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
+  baixar,
   get: (path) => request(path),
   post: (path, body) => request(path, { method: "POST", body: JSON.stringify(body) }),
   postForm: (path, formData) => request(path, { method: "POST", body: formData }),

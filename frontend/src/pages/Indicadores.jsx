@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Download, Loader2, RefreshCw, Upload } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -54,6 +54,20 @@ export default function Indicadores() {
   const repro = useRecurso(() => indicadoresService.reproducao(), []);
   const projecao = useRecurso(() => indicadoresService.projecao(), []);
   const fazenda = useRecurso(() => fazendaService.atual(), []);
+  const [exportando, setExportando] = useState(false);
+  const [erroExport, setErroExport] = useState("");
+
+  const exportar = async () => {
+    setExportando(true);
+    setErroExport("");
+    try {
+      await indicadoresService.exportar(inicio, fim);
+    } catch (e) {
+      setErroExport(e.message || "Não foi possível exportar os dados.");
+    } finally {
+      setExportando(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -61,13 +75,13 @@ export default function Indicadores() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold" style={{ color: C.ink }}>Período</span>
-          <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: C.line }} role="group" aria-label="Período">
+          <div className="flex flex-wrap rounded-lg border overflow-hidden" style={{ borderColor: C.line }} role="group" aria-label="Período">
             {PERIODOS.map((p) => (
               <button
                 key={p.v}
                 onClick={() => setPeriodo(p.v)}
                 aria-pressed={periodo === p.v}
-                className="px-3 py-1.5 text-sm"
+                className="px-3 py-1.5 text-sm whitespace-nowrap"
                 style={{ backgroundColor: periodo === p.v ? C.pasto900 : "#fff", color: periodo === p.v ? "#fff" : C.inkSoft }}
               >
                 {p.l}
@@ -84,11 +98,19 @@ export default function Indicadores() {
             </div>
           )}
         </div>
-        <span className="text-xs" style={{ ...fMono, color: C.inkSoft }}>{formatDate(inicio)} – {formatDate(fim)}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ ...fMono, color: C.inkSoft }}>{formatDate(inicio)} – {formatDate(fim)}</span>
+          <button onClick={exportar} disabled={exportando} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold"
+            style={{ backgroundColor: C.brinco, color: "#fff" }} title="CSV com uma linha por dia do período selecionado">
+            {exportando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exportar dados para análise
+          </button>
+        </div>
       </div>
+      {erroExport && <Aviso texto={erroExport} erro />}
 
       <SecaoRebanho serie={serie} />
-      <SecaoClima clima={clima} fazenda={fazenda} />
+      <SecaoClima clima={clima} fazenda={fazenda} inicio={inicio} fim={fim} />
       <SecaoReproducao repro={repro} />
       <SecaoProjecao projecao={projecao} />
     </div>
@@ -177,7 +199,7 @@ function SecaoRebanho({ serie }) {
 
 // ------------------------------------------------------------------ clima
 
-function SecaoClima({ clima, fazenda }) {
+function SecaoClima({ clima, fazenda, inicio, fim }) {
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState("");
   const [erroImport, setErroImport] = useState("");
@@ -205,7 +227,17 @@ function SecaoClima({ clima, fazenda }) {
   const ituMedio = media(dias.filter((d) => d.ituMedio !== null).map((d) => d.ituMedio));
   const comMax = dias.filter((d) => d.ituMax !== null);
   const diasEstresse = comMax.filter((d) => d.ituMax > 72).length;
-  const grafico = dias.map((d) => ({ dia: diaCurto(d.data), data: d.data, medio: d.ituMedio, maximo: d.ituMax }));
+  // todos os dias do período (dia sem clima fica vazio), para o eixo bater com os gráficos de produção
+  const porData = new Map(dias.map((d) => [d.data, d]));
+  const grafico = [];
+  for (let dia = inicio; dia <= fim; dia = addDays(dia, 1)) {
+    const c = porData.get(dia);
+    grafico.push({ dia: diaCurto(dia), data: dia, medio: c?.ituMedio ?? null, maximo: c?.ituMax ?? null });
+  }
+  // eixo em números inteiros, sempre mostrando a linha de 72
+  const valores = dias.flatMap((d) => [d.ituMedio, d.ituMax]).filter((v) => v !== null);
+  const eixoMin = Math.floor(Math.min(70, ...valores) / 5) * 5;
+  const eixoMax = Math.ceil(Math.max(75, ...valores) / 5) * 5;
 
   const acoes = (
     <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer"
@@ -235,7 +267,8 @@ function SecaoClima({ clima, fazenda }) {
             <LineChart data={grafico}>
               <CartesianGrid stroke={SERIE.grade} vertical={false} />
               <XAxis dataKey="dia" tick={eixo} tickLine={false} axisLine={{ stroke: SERIE.grade }} minTickGap={16} />
-              <YAxis tick={eixo} tickLine={false} axisLine={false} width={36} domain={["dataMin - 2", "dataMax + 2"]} />
+              <YAxis tick={eixo} tickLine={false} axisLine={false} width={36} domain={[eixoMin, eixoMax]} allowDecimals={false}
+                ticks={Array.from({ length: (eixoMax - eixoMin) / 5 + 1 }, (_, i) => eixoMin + i * 5)} />
               <Tooltip content={<Dica casas={1} />} />
               <Legend wrapperStyle={legenda} />
               <ReferenceLine y={72} stroke={SERIE.referencia} strokeDasharray="4 4"
