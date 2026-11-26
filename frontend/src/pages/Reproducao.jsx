@@ -17,6 +17,7 @@ export default function Reproducao({ data }) {
   const [form, setForm] = useState(novoEventoReproducao());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [salvoAgora, setSalvoAgora] = useState(""); // confirmação do "Salvar e continuar"
   const [registrandoReproducao, setRegistrandoReproducao] = useState(null);
   const [modalReproducao, setModalReproducao] = useState({
     aberta: false,
@@ -41,7 +42,8 @@ export default function Reproducao({ data }) {
     setAnimais((prev) => prev.map((a) => (a.id === atualizado.id ? atualizado : a)));
   };
 
-  const add = async () => {
+  // continuar = true: mantém o formulário aberto com o mesmo animal e a mesma data
+  const add = async (continuar = false) => {
     if (!form.animalId || !form.tipo) return;
     if (form.tipo === "diagnostico_prenhez" && !form.resultado) {
       setErro("Informe o resultado do diagnóstico: prenhe ou vazia.");
@@ -58,9 +60,17 @@ export default function Reproducao({ data }) {
       setReproducao((prev) => [...prev, criado]);
       await sincronizarAnimal(criado.animalId, criado.tipo);
 
-      setForm(novoEventoReproducao());
-      setOpen(false);
+      if (continuar) {
+        const tipo = TIPOS_REPRO.find((t) => t.v === criado.tipo)?.l || criado.tipo;
+        setSalvoAgora(`${tipo} de ${formatDate(criado.data)} salvo. Continue cadastrando para ${rotuloAnimal(animais.find((a) => a.id === criado.animalId))}.`);
+        setForm({ ...novoEventoReproducao(), animalId: form.animalId, data: form.data, tipo: form.tipo });
+      } else {
+        setSalvoAgora("");
+        setForm(novoEventoReproducao());
+        setOpen(false);
+      }
     } catch (e) {
+      setSalvoAgora("");
       setErro(e.message || "Não foi possível salvar o evento.");
     } finally {
       setSalvando(false);
@@ -168,6 +178,7 @@ export default function Reproducao({ data }) {
         <button
           onClick={() => {
             setRegistrandoReproducao(null);
+            setSalvoAgora("");
             setOpen((o) => !o);
           }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold"
@@ -252,11 +263,18 @@ export default function Reproducao({ data }) {
             </Field>
           )}
 
-          <div className="sm:col-span-2 flex justify-end gap-2">
+          {salvoAgora && (
+            <p className="sm:col-span-2 text-sm rounded-lg px-3 py-2 flex items-center gap-1.5" style={{ backgroundColor: C.pasto50, color: C.pasto900 }} role="status">
+              <CheckCircle size={16} /> {salvoAgora}
+            </p>
+          )}
+
+          <div className="sm:col-span-2 flex flex-wrap justify-end gap-2">
             <button
               onClick={() => {
                 setOpen(false);
                 setRegistrandoReproducao(null);
+                setSalvoAgora("");
                 setForm(novoEventoReproducao());
               }}
               className="px-3 py-2 text-sm rounded-lg"
@@ -265,7 +283,16 @@ export default function Reproducao({ data }) {
               Cancelar
             </button>
             <button
-              onClick={add}
+              onClick={() => add(true)}
+              disabled={salvando}
+              className="px-4 py-2 text-sm rounded-lg font-semibold border"
+              style={{ borderColor: C.pasto900, color: C.pasto900, backgroundColor: "#fff" }}
+              title="Salva e deixa o formulário aberto para o mesmo animal"
+            >
+              Salvar e continuar
+            </button>
+            <button
+              onClick={() => add(false)}
               disabled={salvando}
               className="px-4 py-2 text-sm rounded-lg font-semibold"
               style={{ backgroundColor: C.pasto900, color: "#fff" }}
