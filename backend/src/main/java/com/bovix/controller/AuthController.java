@@ -7,6 +7,8 @@ import com.bovix.dto.RedefinirSenhaRequest;
 import com.bovix.dto.RegistroRequest;
 import com.bovix.security.SecurityUtils;
 import com.bovix.service.AuthService;
+import com.bovix.service.LimiteCadastros;
+import jakarta.servlet.http.HttpServletRequest;
 import com.bovix.service.RedefinicaoSenhaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +24,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final RedefinicaoSenhaService redefinicaoSenhaService;
+    private final LimiteCadastros limiteCadastros;
 
     @PostMapping("/registrar")
-    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody RegistroRequest req) {
-        return ResponseEntity.ok(authService.registrar(req));
+    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody RegistroRequest req, HttpServletRequest request) {
+        String ip = LimiteCadastros.ipDoCliente(request);
+        limiteCadastros.verificar(ip);
+        AuthResponse resposta = authService.registrar(req);
+        limiteCadastros.registrar(ip); // só conta cadastros que deram certo
+        return ResponseEntity.ok(resposta);
     }
 
     @PostMapping("/login")

@@ -1,5 +1,6 @@
 package com.bovix.config;
 
+import com.bovix.service.LimiteCadastros;
 import com.bovix.service.LimiteTentativasLogin;
 import com.bovix.service.RegraNegocioException;
 import jakarta.validation.ConstraintViolationException;
@@ -111,6 +112,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LimiteTentativasLogin.MuitasTentativasException.class)
     public ResponseEntity<Map<String, String>> tratarMuitasTentativas(LimiteTentativasLogin.MuitasTentativasException e) {
+        return erro(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+    }
+
+    @ExceptionHandler(LimiteCadastros.MuitosCadastrosException.class)
+    public ResponseEntity<Map<String, String>> tratarMuitosCadastros(LimiteCadastros.MuitosCadastrosException e) {
         return erro(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
     }
 
