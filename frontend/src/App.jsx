@@ -11,6 +11,7 @@ import Saude from "./pages/Saude";
 import Ordenha from "./pages/Ordenha";
 import Financeiro from "./pages/Financeiro";
 import Ocorrencias from "./pages/Ocorrencias";
+import Indicadores from "./pages/Indicadores";
 import { useAuth } from "./hooks/useAuth";
 import { useFarmData } from "./hooks/useFarmData";
 import { useAlerts } from "./hooks/useAlerts";
@@ -87,6 +88,7 @@ function AppLogado({ auth }) {
         {tab === "ordenha" && <Ordenha data={farm} />}
         {tab === "financeiro" && <Financeiro data={farm} />}
         {tab === "ocorrencias" && <Ocorrencias />}
+        {tab === "indicadores" && <Indicadores />}
       </main>
     </div>
   );

@@ -17,7 +17,16 @@ export const C = {
   line: "#E1E3D8",
 };
 
-export const fDisplay = { fontFamily: "'Zilla Slab', serif" };
+// Cores das séries dos gráficos (ordem fixa; validadas para daltonismo e contraste sobre fundo branco).
+// As cores da marca (leite, brinco) ficam acinzentadas ou com pouco contraste como séries.
+export const SERIE = {
+  s1: "#2a78d6", // azul
+  s2: "#eb6834", // laranja
+  referencia: "#8a8f86",
+  grade: "#E1E3D8",
+};
+
+export const fDisplay ={ fontFamily: "'Zilla Slab', serif" };
 export const fBody = { fontFamily: "'Inter', sans-serif" };
 export const fMono = { fontFamily: "'IBM Plex Mono', monospace" };
 

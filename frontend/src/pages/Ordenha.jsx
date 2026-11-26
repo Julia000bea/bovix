@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, TrendingUp, Trash2 } from "lucide-react";
+import { Plus, TrendingUp, Trash2, Upload, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
@@ -31,6 +31,28 @@ export default function Ordenha({ data }) {
       setErro(e.message || "Não foi possível salvar a ordenha.");
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const [importando, setImportando] = useState(false);
+  const [resumo, setResumo] = useState(null);
+
+  const importar = async (e) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!arquivo) return;
+    setImportando(true);
+    setErro("");
+    setResumo(null);
+    try {
+      const r = await ordenhaService.importar(arquivo);
+      setResumo(r);
+      // recarrega só as ordenhas (recarregar tudo trocaria a tela pelo "carregando" e sumiria com o resumo)
+      if (r.importadas + r.substituidas > 0) setOrdenha(await ordenhaService.listarPorPeriodo(addDays(todayStr(), -60), todayStr()));
+    } catch (err) {
+      setErro(err.message || "Não foi possível importar o arquivo.");
+    } finally {
+      setImportando(false);
     }
   };
 
@@ -80,7 +102,30 @@ export default function Ordenha({ data }) {
         )}
       </div>
 
-      <div className="flex justify-end">
+      {resumo && (
+        <div className="rounded-xl border bg-white p-4 text-sm" style={{ borderColor: C.line }}>
+          <p style={{ color: C.ink }}>
+            Importação concluída: <strong>{resumo.importadas}</strong> dia(s) novos, <strong>{resumo.substituidas}</strong> substituído(s)
+            e <strong>{resumo.rejeitadas.length}</strong> linha(s) rejeitada(s).
+          </p>
+          {resumo.rejeitadas.length > 0 && (
+            <ul className="mt-2 text-xs flex flex-col gap-0.5 max-h-48 overflow-y-auto" style={{ color: C.cio }}>
+              {resumo.rejeitadas.map((r) => (
+                <li key={r.linha}>Linha {r.linha} <span style={{ ...fMono, color: C.inkSoft }}>({r.conteudo})</span>: {r.motivo}</li>
+              ))}
+            </ul>
+          )}
+          <button onClick={() => setResumo(null)} className="mt-2 text-xs underline" style={{ color: C.inkSoft }}>Fechar</button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer border" style={{ borderColor: C.line, color: C.pasto900, backgroundColor: "#fff" }}
+          title="CSV com duas colunas: data;litros (total do rebanho por dia)">
+          {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+          Importar CSV (data;litros)
+          <input type="file" accept=".csv,text/csv,text/plain" className="hidden" disabled={importando} onChange={importar} />
+        </label>
         <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.brinco, color: "#fff" }}>
           <Plus size={16} /> Registrar ordenha
         </button>
