@@ -3,6 +3,7 @@ package com.bovix.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,6 +28,16 @@ public class Fazenda {
 
     @Column(length = 2)
     private String estado;
+
+    // Localização e estação do INMET (clima/ITU). Alteradas só por PUT /fazendas/{id}/localizacao.
+    @Column(precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal longitude;
+
+    @Column(name = "estacao_inmet", length = 10)
+    private String estacaoInmet;
 
     @Column(name = "criado_em", updatable = false)
     private LocalDateTime criadoEm;
