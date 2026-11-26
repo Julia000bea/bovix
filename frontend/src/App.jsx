@@ -10,6 +10,7 @@ import Reproducao from "./pages/Reproducao";
 import Saude from "./pages/Saude";
 import Ordenha from "./pages/Ordenha";
 import Financeiro from "./pages/Financeiro";
+import Ocorrencias from "./pages/Ocorrencias";
 import { useAuth } from "./hooks/useAuth";
 import { useFarmData } from "./hooks/useFarmData";
 import { useAlerts } from "./hooks/useAlerts";
@@ -85,6 +86,7 @@ function AppLogado({ auth }) {
         {tab === "saude" && <Saude data={farm} />}
         {tab === "ordenha" && <Ordenha data={farm} />}
         {tab === "financeiro" && <Financeiro data={farm} />}
+        {tab === "ocorrencias" && <Ocorrencias />}
       </main>
     </div>
   );
