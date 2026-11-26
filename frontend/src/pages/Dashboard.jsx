@@ -3,6 +3,7 @@ import InsightsPanel from "../components/InsightsPanel";
 import { C } from "../utils/tokens";
 import { todayStr } from "../utils/date";
 import { litrosPorDia } from "../utils/producao";
+import { reproducaoService } from "../services/reproducaoService";
 
 export default function Dashboard({ data, alerts, quadro, insights, setTab }) {
   const { animais, ordenha } = data;
@@ -12,9 +13,18 @@ export default function Dashboard({ data, alerts, quadro, insights, setTab }) {
   const hoje = todayStr();
   const litrosHoje = litrosPorDia(ordenha)[hoje] || 0;
 
+  // Diagnóstico de prenhez direto do Quadro do dia. Atualizar a lista de reprodução faz o quadro
+  // recarregar (o alerta some e, se prenhe, a previsão de parto passa a valer).
+  const registrarDiagnostico = async (animalId, resultado, dataDiagnostico) => {
+    const criado = await reproducaoService.criar(animalId, { tipo: "diagnostico_prenhez", data: dataDiagnostico, resultado });
+    data.setReproducao((prev) => [...prev, criado]);
+    return criado;
+  };
+
   return (
     <div className="flex flex-col gap-5">
-      <QuadroDoDia alerts={alerts} carregando={quadro?.carregando} erro={quadro?.erro} onTentarDeNovo={quadro?.recarregar} />
+      <QuadroDoDia alerts={alerts} carregando={quadro?.carregando} erro={quadro?.erro} onTentarDeNovo={quadro?.recarregar}
+        onDiagnosticar={registrarDiagnostico} />
       <InsightsPanel insights={insights} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Syringe, Trash2 } from "lucide-react";
+import { CheckCircle, Plus, Syringe, Trash2 } from "lucide-react";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker, { TODO_REBANHO } from "../components/AnimalPicker";
 import { C, TIPOS_SAUDE, fMono } from "../utils/tokens";
@@ -14,8 +14,10 @@ export default function Saude({ data }) {
   const [form, setForm] = useState(novoEventoSaude());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [salvoAgora, setSalvoAgora] = useState(""); // confirmação do "Salvar e continuar"
 
-  const add = async () => {
+  // continuar = true: mantém o formulário aberto com o mesmo animal e a mesma data
+  const add = async (continuar = false) => {
     if (!form.animalId || !form.produto) return;
     const paraRebanho = form.animalId === TODO_REBANHO;
     if (paraRebanho) {
@@ -32,9 +34,17 @@ export default function Saude({ data }) {
         const criado = await saudeService.criar(form.animalId, form);
         setSaude((prev) => [...prev, criado]);
       }
-      setForm(novoEventoSaude());
-      setOpen(false);
+      if (continuar) {
+        const quem = paraRebanho ? "todo o rebanho" : rotuloAnimal(animais.find((a) => String(a.id) === String(form.animalId)));
+        setSalvoAgora(`${form.produto} salvo para ${quem}. Continue cadastrando.`);
+        setForm({ ...novoEventoSaude(), animalId: form.animalId, data: form.data, tipo: form.tipo });
+      } else {
+        setSalvoAgora("");
+        setForm(novoEventoSaude());
+        setOpen(false);
+      }
     } catch (e) {
+      setSalvoAgora("");
       setErro(e.message || "Não foi possível salvar o registro.");
     } finally {
       setSalvando(false);
@@ -58,7 +68,7 @@ export default function Saude({ data }) {
     <div className="flex flex-col gap-4">
       <ErrorText text={erro} />
       <div className="flex justify-end">
-        <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.leite, color: "#fff" }}>
+        <button onClick={() => { setSalvoAgora(""); setOpen((o) => !o); }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.leite, color: "#fff" }}>
           <Plus size={16} /> Novo registro
         </button>
       </div>
@@ -84,9 +94,18 @@ export default function Saude({ data }) {
           <div className="sm:col-span-2">
             <Field label="Observações"><input className={inputCls} style={{ ...inputStyle, width: "100%" }} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></Field>
           </div>
-          <div className="sm:col-span-2 flex justify-end gap-2">
-            <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
-            <button onClick={add} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
+          {salvoAgora && (
+            <p className="sm:col-span-2 text-sm rounded-lg px-3 py-2 flex items-center gap-1.5" style={{ backgroundColor: C.pasto50, color: C.pasto900 }} role="status">
+              <CheckCircle size={16} /> {salvoAgora}
+            </p>
+          )}
+          <div className="sm:col-span-2 flex flex-wrap justify-end gap-2">
+            <button onClick={() => { setOpen(false); setSalvoAgora(""); }} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
+            <button onClick={() => add(true)} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold border"
+              style={{ borderColor: C.pasto900, color: C.pasto900, backgroundColor: "#fff" }} title="Salva e deixa o formulário aberto para o mesmo animal">
+              Salvar e continuar
+            </button>
+            <button onClick={() => add(false)} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
               {salvando ? "Salvando…" : "Salvar registro"}
             </button>
           </div>
