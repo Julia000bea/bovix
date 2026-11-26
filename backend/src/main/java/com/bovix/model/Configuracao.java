@@ -32,6 +32,16 @@ public class Configuracao {
     @Builder.Default
     private Integer cioDias = 21;
 
+    /** "Vacas vazias há mais de X dias após o parto" nos indicadores reprodutivos. */
+    @Column(name = "dias_vazia_alerta", nullable = false)
+    @Builder.Default
+    private Integer diasVaziaAlerta = 90;
+
+    /** Dias antes do parto previsto em que a vaca é secada (alerta de secagem e projeção). */
+    @Column(name = "periodo_seco_dias", nullable = false)
+    @Builder.Default
+    private Integer periodoSecoDias = 60;
+
     // --- Relatório diário por e-mail ---
     @Column(name = "notificacao_ativa", nullable = false)
     @Builder.Default

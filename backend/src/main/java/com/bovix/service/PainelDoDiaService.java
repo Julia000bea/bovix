@@ -1,5 +1,6 @@
 package com.bovix.service;
 
+import com.bovix.calculo.CicloReprodutivo;
 import com.bovix.dto.AlertaDoDia;
 import com.bovix.model.Animal;
 import com.bovix.model.Configuracao;
@@ -32,23 +33,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PainelDoDiaService {
 
-    static final Set<String> TIPOS_COBERTURA = Set.of("inseminacao", "reproducao");
-    static final Set<String> TIPOS_CIO = Set.of("cio_detectado", "cio_confirmado");
-
     private static final int GESTACAO_PADRAO = 283;
     private static final int CIO_PADRAO = 21;
-    private static final int DIAS_SECAGEM_ANTES_DO_PARTO = 60;
+    private static final int PERIODO_SECO_PADRAO = 60;
     private static final int DIAS_PRE_PARTO_ANTES_DO_PARTO = 21;
     private static final int DIAS_PARA_DIAGNOSTICO = 30;
 
     private static final Map<String, Integer> ORDEM_URGENCIA = Map.of(
             "atrasado", 0, "urgente", 1, "ativo", 2, "proximo", 3
     );
-
-    private static final Comparator<EventoReproducao> MAIS_RECENTE_PRIMEIRO =
-            Comparator.comparing(EventoReproducao::getData)
-                    .thenComparing(EventoReproducao::getId, Comparator.nullsFirst(Comparator.naturalOrder()))
-                    .reversed();
 
     private final AnimalRepository animalRepository;
     private final EventoReproducaoRepository reproducaoRepository;
@@ -72,6 +65,7 @@ public class PainelDoDiaService {
         Configuracao config = configuracaoRepository.findByFazenda_Id(fazendaId).orElse(null);
         int gestacaoDias = config != null && config.getGestacaoDias() != null ? config.getGestacaoDias() : GESTACAO_PADRAO;
         int cioDias = config != null && config.getCioDias() != null ? config.getCioDias() : CIO_PADRAO;
+        int periodoSecoDias = config != null && config.getPeriodoSecoDias() != null ? config.getPeriodoSecoDias() : PERIODO_SECO_PADRAO;
 
         List<Animal> ativos = animalRepository.findByFazenda_IdOrderByBrincoAsc(fazendaId).stream()
                 .filter(a -> "Ativa".equals(a.getStatus()))
@@ -84,10 +78,8 @@ public class PainelDoDiaService {
 
         List<AlertaDoDia> alertas = new ArrayList<>();
         for (Animal animal : ativos) {
-            List<EventoReproducao> repro = reproPorAnimal.getOrDefault(animal.getId(), List.of()).stream()
-                    .sorted(MAIS_RECENTE_PRIMEIRO)
-                    .toList();
-            alertasReprodutivos(animal, repro, hoje, gestacaoDias, cioDias, alertas);
+            List<EventoReproducao> repro = reproPorAnimal.getOrDefault(animal.getId(), List.of());
+            alertasReprodutivos(animal, repro, hoje, gestacaoDias, cioDias, periodoSecoDias, alertas);
             alertasSaude(animal, saudePorAnimal.getOrDefault(animal.getId(), List.of()), hoje, alertas);
         }
 
@@ -100,63 +92,47 @@ public class PainelDoDiaService {
     // ------------------------------------------------------------------ reprodução
 
     private void alertasReprodutivos(Animal animal, List<EventoReproducao> eventos, LocalDate hoje,
-                                     int gestacaoDias, int cioDias, List<AlertaDoDia> alertas) {
-        LocalDate ultimoParto = eventos.stream()
-                .filter(e -> "parto".equals(e.getTipo()))
-                .map(EventoReproducao::getData)
-                .findFirst().orElse(null);
+                                     int gestacaoDias, int cioDias, int periodoSecoDias, List<AlertaDoDia> alertas) {
+        CicloReprodutivo.Estado estado = CicloReprodutivo.estado(eventos, hoje, gestacaoDias);
 
-        List<EventoReproducao> ciclo = eventos.stream()
-                .filter(e -> ultimoParto == null || e.getData().isAfter(ultimoParto))
-                .toList();
-
-        EventoReproducao marco = ciclo.stream()
-                .filter(e -> TIPOS_CIO.contains(e.getTipo()) || TIPOS_COBERTURA.contains(e.getTipo()))
-                .findFirst().orElse(null);
-        if (marco == null) return;
-
-        if (TIPOS_CIO.contains(marco.getTipo())) {
-            LocalDate proximoCio = marco.getData().plusDays(cioDias);
-            alertaJanelaCio(animal, "cio", proximoCio, hoje, "Janela de cio prevista — " + formatar(proximoCio), alertas);
-            return;
+        switch (estado.situacao()) {
+            case SEM_COBERTURA -> {
+                return;
+            }
+            case CIO -> {
+                LocalDate proximoCio = estado.marco().getData().plusDays(cioDias);
+                alertaJanelaCio(animal, "cio", proximoCio, hoje, "Janela de cio prevista — " + formatar(proximoCio), alertas);
+                return;
+            }
+            case VAZIA -> {
+                EventoReproducao fim = estado.encerramento();
+                LocalDate proximoCio = fim.getData().plusDays(cioDias);
+                String motivo = "perda_gestacional".equals(fim.getTipo()) ? "perda gestacional" : "diagnóstico: vazia";
+                alertaJanelaCio(animal, "retorno", proximoCio, hoje,
+                        "Possível retorno de cio (" + motivo + ") — janela " + formatar(proximoCio), alertas);
+                return;
+            }
+            default -> { /* COBERTA ou PRENHE: segue abaixo */ }
         }
 
-        EventoReproducao cobertura = marco;
-        List<EventoReproducao> posCobertura = ciclo.subList(0, ciclo.indexOf(cobertura));
-
-        // diagnóstico mais recente com resultado (ou prenhez confirmada) decide se a gestação segue
-        EventoReproducao ultimoResultado = posCobertura.stream()
-                .filter(e -> "prenhez_confirmada".equals(e.getTipo())
-                        || ("diagnostico_prenhez".equals(e.getTipo()) && e.getResultado() != null))
-                .findFirst().orElse(null);
-
-        if (ultimoResultado != null && "vazia".equals(ultimoResultado.getResultado())) {
-            LocalDate proximoCio = ultimoResultado.getData().plusDays(cioDias);
-            alertaJanelaCio(animal, "retorno", proximoCio, hoje,
-                    "Possível retorno de cio (diagnóstico: vazia) — janela " + formatar(proximoCio), alertas);
-            return;
-        }
-        boolean confirmada = ultimoResultado != null;
-
-        LocalDate previsao = previsaoParto(cobertura, posCobertura, gestacaoDias);
+        EventoReproducao cobertura = estado.cobertura();
+        LocalDate previsao = estado.previsaoParto();
         long diasParto = ChronoUnit.DAYS.between(hoje, previsao);
         if (diasParto <= 15 && diasParto >= -10) {
             alertas.add(alerta("parto-" + animal.getId(), animal, "parto", urgenciaParto(diasParto), diasParto,
                     textoParto(diasParto, previsao)));
         }
 
-        if (confirmada) {
-            boolean secou = posCobertura.stream().anyMatch(e -> "secagem".equals(e.getTipo()) || "pre_parto".equals(e.getTipo()));
-            if (!secou && diasParto > 0) {
-                LocalDate dataSecagem = previsao.minusDays(DIAS_SECAGEM_ANTES_DO_PARTO);
+        if (estado.situacao() == CicloReprodutivo.Situacao.PRENHE) {
+            if (!estado.secou() && diasParto > 0) {
+                LocalDate dataSecagem = previsao.minusDays(periodoSecoDias);
                 long dias = ChronoUnit.DAYS.between(hoje, dataSecagem);
                 if (dias <= 7) {
                     alertas.add(alerta("secagem-" + animal.getId(), animal, "secagem", urgenciaPrazo(dias), dias,
                             textoPrazo("Secagem", dias, dataSecagem) + " (parto previsto " + formatar(previsao) + ")"));
                 }
             }
-            boolean entrouPreParto = posCobertura.stream().anyMatch(e -> "pre_parto".equals(e.getTipo()));
-            if (!entrouPreParto && diasParto > 0) {
+            if (!estado.entrouPreParto() && diasParto > 0) {
                 LocalDate dataPreParto = previsao.minusDays(DIAS_PRE_PARTO_ANTES_DO_PARTO);
                 long dias = ChronoUnit.DAYS.between(hoje, dataPreParto);
                 if (dias <= 7) {
@@ -180,15 +156,6 @@ public class PainelDoDiaService {
                     "Diagnóstico de prenhez pendente — " + diasDesdeCobertura + " dias desde a cobertura de "
                             + formatar(cobertura.getData())));
         }
-    }
-
-    /** Previsão informada no diagnóstico/confirmação tem prioridade; senão, cobertura + gestação configurada. */
-    private LocalDate previsaoParto(EventoReproducao cobertura, List<EventoReproducao> posCobertura, int gestacaoDias) {
-        return posCobertura.stream()
-                .filter(e -> e.getPrevisaoParto() != null)
-                .map(EventoReproducao::getPrevisaoParto)
-                .findFirst()
-                .orElse(cobertura.getData().plusDays(gestacaoDias));
     }
 
     private void alertaJanelaCio(Animal animal, String prefixo, LocalDate data, LocalDate hoje, String texto,

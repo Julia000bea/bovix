@@ -1,6 +1,10 @@
 package com.bovix.service;
 
 import com.bovix.calculo.IndicadoresRebanho;
+import com.bovix.calculo.IndicadoresReprodutivos;
+import com.bovix.calculo.ProjecaoLactacao;
+import com.bovix.model.Configuracao;
+import com.bovix.repository.ConfiguracaoRepository;
 import com.bovix.model.Animal;
 import com.bovix.model.EventoReproducao;
 import com.bovix.repository.AnimalRepository;
@@ -12,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -20,7 +25,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Série diária de produção e lactação do rebanho (tarefa 2 do TCC). */
+/** Indicadores do TCC: série diária do rebanho, indicadores reprodutivos e projeção de lactação. */
 @Service
 @RequiredArgsConstructor
 public class IndicadoresService {
@@ -41,13 +46,47 @@ public class IndicadoresService {
     private final AnimalRepository animalRepository;
     private final EventoReproducaoRepository reproducaoRepository;
     private final ProducaoDiariaRepository producaoRepository;
+    private final ConfiguracaoRepository configuracaoRepository;
     private final FazendaService fazendaService;
+    private final Clock clock;
+
+    /** Parâmetros da fazenda usados nos cálculos (com os padrões quando não configurados). */
+    public record Parametros(int gestacaoDias, int diasVaziaAlerta, int periodoSecoDias) {}
 
     @Transactional(readOnly = true)
     public List<PontoSerie> serie(Long fazendaId, LocalDate inicio, LocalDate fim) {
         fazendaService.verificarPropriedade(fazendaId);
         validarPeriodo(inicio, fim);
         return calcularSerie(carregar(fazendaId), producaoRepository.totaisPorDia(fazendaId, inicio, fim), inicio, fim);
+    }
+
+    /** Indicadores reprodutivos dos últimos 12 meses (até hoje). */
+    @Transactional(readOnly = true)
+    public IndicadoresReprodutivos.Resultado reproducao(Long fazendaId) {
+        fazendaService.verificarPropriedade(fazendaId);
+        Parametros p = parametros(fazendaId);
+        DadosFazenda dados = carregar(fazendaId);
+        return IndicadoresReprodutivos.calcular(dados.animais(), dados.eventosPorAnimal(), LocalDate.now(clock),
+                p.gestacaoDias(), p.diasVaziaAlerta());
+    }
+
+    /** Projeção de vacas em lactação para os próximos 12 meses. */
+    @Transactional(readOnly = true)
+    public List<ProjecaoLactacao.Mes> projecao(Long fazendaId) {
+        fazendaService.verificarPropriedade(fazendaId);
+        Parametros p = parametros(fazendaId);
+        DadosFazenda dados = carregar(fazendaId);
+        return ProjecaoLactacao.projetar(dados.animais(), dados.eventosPorAnimal(), LocalDate.now(clock),
+                p.gestacaoDias(), p.periodoSecoDias(), 12);
+    }
+
+    /** Sem checagem de dono: só para uso interno, depois de verificarPropriedade. */
+    Parametros parametros(Long fazendaId) {
+        Configuracao c = configuracaoRepository.findByFazenda_Id(fazendaId).orElse(null);
+        return new Parametros(
+                c != null && c.getGestacaoDias() != null ? c.getGestacaoDias() : 283,
+                c != null && c.getDiasVaziaAlerta() != null ? c.getDiasVaziaAlerta() : 90,
+                c != null && c.getPeriodoSecoDias() != null ? c.getPeriodoSecoDias() : 60);
     }
 
     static void validarPeriodo(LocalDate inicio, LocalDate fim) {

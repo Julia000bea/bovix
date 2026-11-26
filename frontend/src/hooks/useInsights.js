@@ -103,11 +103,11 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     const ativos = animais.filter((a) => a.status === "Ativa");
     for (const a of ativos) {
       const repro = reproducao.filter((e) => e.animalId === a.id).sort((x, y) => (x.data < y.data ? 1 : -1));
-      // cobertura = inseminação ou monta natural; parto, novo cio ou diagnóstico "vazia" encerram a gestação
+      // cobertura = inseminação ou monta natural; parto, novo cio, diagnóstico "vazia" ou perda gestacional encerram a gestação
       const ultimaCobertura = repro.find((e) => ["inseminacao", "reproducao"].includes(e.tipo));
       if (!ultimaCobertura) continue;
       const temEventoDepois = repro.some(
-        (e) => (e.tipo === "parto" || ["cio_detectado", "cio_confirmado"].includes(e.tipo)
+        (e) => (e.tipo === "parto" || e.tipo === "perda_gestacional" || ["cio_detectado", "cio_confirmado"].includes(e.tipo)
           || (e.tipo === "diagnostico_prenhez" && e.resultado === "vazia")) && e.data > ultimaCobertura.data
       );
       if (temEventoDepois) continue;

@@ -4,6 +4,7 @@ import com.bovix.model.Animal;
 import com.bovix.model.EventoReproducao;
 import com.bovix.model.Fazenda;
 import com.bovix.repository.AnimalRepository;
+import com.bovix.repository.ConfiguracaoRepository;
 import com.bovix.repository.EventoReproducaoRepository;
 import com.bovix.repository.ProducaoDiariaRepository;
 import com.bovix.repository.ProducaoDiariaRepository.ProducaoDia;
@@ -11,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +31,9 @@ class IndicadoresServiceTest {
     private final ProducaoDiariaRepository producaoRepository = mock(ProducaoDiariaRepository.class);
     private final FazendaService fazendaService = mock(FazendaService.class);
     private final IndicadoresService service =
-            new IndicadoresService(animalRepository, reproducaoRepository, producaoRepository, fazendaService);
+            new IndicadoresService(animalRepository, reproducaoRepository, producaoRepository,
+                    mock(ConfiguracaoRepository.class), fazendaService,
+                    Clock.fixed(Instant.parse("2026-06-30T12:00:00Z"), ZoneId.of("America/Sao_Paulo")));
 
     @Test
     void serieDiariaComDiaSemDadoVazio() {
@@ -59,6 +65,15 @@ class IndicadoresServiceTest {
 
         assertThatThrownBy(() -> service.serie(2L, D.minusDays(5), D)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(animalRepository, reproducaoRepository, producaoRepository);
+    }
+
+    @Test
+    void naoAcessaReproducaoNemProjecaoDeOutraFazenda() {
+        when(fazendaService.verificarPropriedade(2L)).thenThrow(new AccessDeniedException("não é sua"));
+
+        assertThatThrownBy(() -> service.reproducao(2L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.projecao(2L)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(animalRepository, reproducaoRepository);
     }
 
     @Test

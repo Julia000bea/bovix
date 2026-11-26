@@ -28,6 +28,8 @@ public class ConfiguracaoService {
         Configuracao config = buscarOuCriar(fazendaId);
         if (dados.getGestacaoDias() != null) config.setGestacaoDias(dados.getGestacaoDias());
         if (dados.getCioDias() != null) config.setCioDias(dados.getCioDias());
+        if (dados.getDiasVaziaAlerta() != null) config.setDiasVaziaAlerta(dados.getDiasVaziaAlerta());
+        if (dados.getPeriodoSecoDias() != null) config.setPeriodoSecoDias(dados.getPeriodoSecoDias());
         if (dados.getNotificacaoAtiva() != null) config.setNotificacaoAtiva(dados.getNotificacaoAtiva());
         if (dados.getNotificacaoEmail() != null) {
             String email = dados.getNotificacaoEmail().trim();

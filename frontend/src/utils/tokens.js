@@ -34,6 +34,7 @@ export const TIPOS_REPRO = [
   { v: "secagem", l: "Secagem" },
   { v: "pre_parto", l: "Pré-parto" },
   { v: "parto", l: "Parto" },
+  { v: "perda_gestacional", l: "Perda gestacional (aborto)" },
 ];
 
 export const STATUS_REPRODUCAO = [
