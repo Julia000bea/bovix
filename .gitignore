@@ -14,3 +14,7 @@ node_modules/
 # geral
 .DS_Store
 .jdk/
+# análise do TCC (dados da fazenda e resultados ficam fora do git)
+analise/.venv/
+analise/resultados/
+analise/*.csv
