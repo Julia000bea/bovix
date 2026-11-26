@@ -26,6 +26,12 @@ public class SaudeController {
         return ResponseEntity.ok(service.criar(animalId, dados));
     }
 
+    /** Mesmo registro para todos os animais ativos da fazenda (ex.: vacina anual do rebanho). */
+    @PostMapping("/fazendas/{fazendaId}/saude/rebanho")
+    public List<EventoSaude> criarParaRebanho(@PathVariable Long fazendaId, @Valid @RequestBody EventoSaude dados) {
+        return service.criarParaRebanho(fazendaId, dados);
+    }
+
     @DeleteMapping("/saude/{id}")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
         service.remover(id);

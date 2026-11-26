@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Syringe, Trash2 } from "lucide-react";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
-import AnimalPicker from "../components/AnimalPicker";
+import AnimalPicker, { TODO_REBANHO } from "../components/AnimalPicker";
 import { C, TIPOS_SAUDE, fMono } from "../utils/tokens";
 import { formatDate } from "../utils/date";
 import { novoEventoSaude } from "../models/EventoSaude";
@@ -17,11 +17,21 @@ export default function Saude({ data }) {
 
   const add = async () => {
     if (!form.animalId || !form.produto) return;
+    const paraRebanho = form.animalId === TODO_REBANHO;
+    if (paraRebanho) {
+      const qtd = animais.filter((a) => a.status === "Ativa").length;
+      if (!window.confirm(`Registrar "${form.produto}" para todos os ${qtd} animais ativos?`)) return;
+    }
     setSalvando(true);
     setErro("");
     try {
-      const criado = await saudeService.criar(form.animalId, form);
-      setSaude((prev) => [...prev, criado]);
+      if (paraRebanho) {
+        const criados = await saudeService.criarParaRebanho(form);
+        setSaude((prev) => [...prev, ...criados]);
+      } else {
+        const criado = await saudeService.criar(form.animalId, form);
+        setSaude((prev) => [...prev, criado]);
+      }
       setForm(novoEventoSaude());
       setOpen(false);
     } catch (e) {
@@ -55,7 +65,7 @@ export default function Saude({ data }) {
 
       {open && (
         <div className="rounded-xl border bg-white p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.line }}>
-          <Field label="Animal *"><AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
+          <Field label="Animal *"><AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} todoRebanho /></Field>
           <Field label="Tipo">
             <select className={inputCls} style={inputStyle} value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
               {TIPOS_SAUDE.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}

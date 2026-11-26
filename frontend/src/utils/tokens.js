@@ -6,6 +6,9 @@ export const C = {
   card: "#FFFFFF",
   brinco: "#DB8A2C",
   brincoDark: "#B76F1F",
+  cobre: "#A95B1B",   // botão principal da tela de login
+  creme: "#F5F0E6",   // fundo do círculo do logo
+  marca: "#3A1414",   // cor da vaca do logo
   cio: "#B0473C",
   leite: "#4C7A93",
   terra: "#6B4F3C",
