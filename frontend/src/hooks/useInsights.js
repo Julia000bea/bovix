@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { addDays, daysBetween, todayStr } from "../utils/date";
-import { CATEGORIAS_GASTO } from "../utils/tokens";
+import { CATEGORIAS_GASTO, ehDespesa } from "../utils/tokens";
 import { litrosPorDia } from "../utils/producao";
 
 /**
@@ -76,7 +76,7 @@ export function useInsights({ animais, reproducao, ordenha, financeiro, config }
     const mesAnterior = ultimoDiaMesAnterior.slice(0, 7);
     const limiteDiaAnterior = Math.min(diaDoMes, Number(ultimoDiaMesAnterior.slice(8, 10)));
     const totalCategoria = (mes, ateDia, categoria) =>
-      financeiro.filter((g) => g.data.slice(0, 7) === mes && Number(g.data.slice(8, 10)) <= ateDia && g.categoria === categoria)
+      financeiro.filter((g) => ehDespesa(g) && g.data.slice(0, 7) === mes && Number(g.data.slice(8, 10)) <= ateDia && g.categoria === categoria)
         .reduce((s, g) => s + Number(g.valor || 0), 0);
 
     if (diaDoMes >= 7) { // na primeira semana do mês ainda há poucos lançamentos para comparar

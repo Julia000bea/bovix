@@ -24,6 +24,9 @@ export const fMono = { fontFamily: "'IBM Plex Mono', monospace" };
 export const CATEGORIAS = ["Bezerra", "Novilha", "Vaca lactante", "Vaca seca"];
 export const STATUS_ANIMAL = ["Ativa", "Vendida", "Morta"];
 export const CATEGORIAS_GASTO = ["Ração", "Insumos", "Medicamentos", "Mão de obra", "Manutenção", "Outros"];
+export const CATEGORIAS_RECEITA = ["Venda de leite", "Outros"];
+/** Lançamentos antigos (sem tipo) são despesas. */
+export const ehDespesa = (lancamento) => (lancamento.tipo || "despesa") === "despesa";
 export const TIPOS_REPRO = [
   { v: "cio_detectado", l: "Cio detectado" },
   { v: "cio_confirmado", l: "Cio confirmado" },
