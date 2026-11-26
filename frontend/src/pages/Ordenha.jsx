@@ -22,8 +22,9 @@ export default function Ordenha({ data }) {
     setSalvando(true);
     setErro("");
     try {
-      const criado = await ordenhaService.criar(form, form.animalId || undefined);
-      setOrdenha((prev) => [...prev, criado]);
+      const dados = { ...form, diasColeta: form.animalId ? 1 : Number(form.diasColeta) || 1 };
+      const criados = await ordenhaService.criar(dados, form.animalId || undefined);
+      setOrdenha((prev) => [...prev, ...criados]);
       setForm(novaOrdenha());
       setOpen(false);
     } catch (e) {
@@ -33,12 +34,15 @@ export default function Ordenha({ data }) {
     }
   };
 
-  const remove = async (id) => {
-    if (!window.confirm("Remover este registro de ordenha?")) return;
+  const remove = async (registro) => {
+    const msg = registro.coletaId
+      ? `Este registro faz parte de uma coleta de ${registro.diasColeta} dias. Remover a coleta inteira?`
+      : "Remover este registro de ordenha?";
+    if (!window.confirm(msg)) return;
     setErro("");
     try {
-      await ordenhaService.remover(id);
-      setOrdenha((prev) => prev.filter((e) => e.id !== id));
+      await ordenhaService.remover(registro.id);
+      setOrdenha((prev) => prev.filter((e) => e.id !== registro.id && !(registro.coletaId && e.coletaId === registro.coletaId)));
     } catch (e) {
       setErro(e.message || "Não foi possível remover o registro.");
     }
@@ -92,6 +96,16 @@ export default function Ordenha({ data }) {
             </select>
           </Field>
           <Field label="Litros *"><input type="number" min="0" step="0.1" className={inputCls} style={inputStyle} value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} /></Field>
+          {!form.animalId && (
+            <div className="sm:col-span-2">
+              <Field label="Coleta de quantos dias?">
+                <input type="number" min="1" max="31" className={inputCls} style={inputStyle} value={form.diasColeta} onChange={(e) => setForm({ ...form, diasColeta: e.target.value })} />
+              </Field>
+              <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
+                Deixe 1 se o volume é deste dia. Se o leite foi coletado a cada N dias, informe N: a data acima é o último dia, e o volume é dividido igualmente entre os N dias (marcados como estimados).
+              </p>
+            </div>
+          )}
           <div className="sm:col-span-2 flex justify-end gap-2">
             <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
             <button onClick={add} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
@@ -111,10 +125,11 @@ export default function Ordenha({ data }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium" style={{ color: C.ink }}>
                   {r.animalId ? rotuloAnimal(animais.find((a) => a.id === r.animalId)) : "Total do rebanho"} · {r.periodo}
+                  {r.estimado && <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: C.brinco + "22", color: C.brincoDark }}>estimado · coleta de {r.diasColeta} dias</span>}
                 </p>
               </div>
               <span style={{ ...fMono, color: C.leite, fontWeight: 700 }} className="text-sm">{r.litros} L</span>
-              <button onClick={() => remove(r.id)} className="p-1.5 rounded-md hover:bg-gray-100"><Trash2 size={16} color={C.cio} /></button>
+              <button onClick={() => remove(r)} className="p-1.5 rounded-md hover:bg-gray-100"><Trash2 size={16} color={C.cio} /></button>
             </div>
           ))}
         </div>
