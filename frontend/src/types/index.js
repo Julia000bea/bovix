@@ -11,7 +11,7 @@
  * @property {string} [nome]
  * @property {string} [raca]
  * @property {string} [nascimento]      - 'YYYY-MM-DD'
- * @property {'Bezerra'|'Novilha'|'Vaca lactante'|'Vaca seca'} categoria
+ * @property {'Bezerra'|'Novilha'|'Vaca lactante'|'Vaca seca'|'Bezerro'|'Touro'} categoria
  * @property {'Ativa'|'Vendida'|'Morta'} status
  * @property {string} [notas]
  * @property {string} [fotoUrl]         - URL pública retornada pela API após upload

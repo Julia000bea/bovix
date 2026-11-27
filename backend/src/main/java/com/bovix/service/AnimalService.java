@@ -4,6 +4,7 @@ import com.bovix.model.Animal;
 import com.bovix.model.Fazenda;
 import com.bovix.repository.AnimalFotoRepository;
 import com.bovix.repository.AnimalRepository;
+import com.bovix.repository.EventoReproducaoRepository;
 import com.bovix.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,6 +26,7 @@ public class AnimalService {
     private final AnimalRepository animalRepository;
     private final AnimalFotoRepository animalFotoRepository;
     private final FazendaService fazendaService;
+    private final EventoReproducaoRepository reproducaoRepository;
     private final Clock clock;
 
     private static final Set<String> TIPOS_IMAGEM = Set.of("image/jpeg", "image/png", "image/webp");
@@ -46,6 +48,7 @@ public class AnimalService {
     public Animal criar(Long fazendaId, Animal dados) {
         Fazenda fazenda = fazendaService.verificarPropriedade(fazendaId);
         dados.setFazenda(fazenda);
+        validarCategoria(dados.getCategoria());
         definirDataSaida(dados, dados.getDataSaida(), null);
         return animalRepository.save(dados);
     }
@@ -56,6 +59,12 @@ public class AnimalService {
         existente.setNome(dados.getNome());
         existente.setRaca(dados.getRaca());
         existente.setNascimento(dados.getNascimento());
+        validarCategoria(dados.getCategoria());
+        if (Animal.CATEGORIAS_MACHO.contains(dados.getCategoria()) && !existente.ehMacho()
+                && reproducaoRepository.existsByAnimal_Id(existente.getId())) {
+            throw new RegraNegocioException("Este animal tem eventos de reprodução (cio, cobertura, parto...). "
+                    + "Remova-os antes de mudar a categoria para macho.");
+        }
         existente.setCategoria(dados.getCategoria());
         existente.setStatus(dados.getStatus());
         existente.setNotas(dados.getNotas());
@@ -81,6 +90,13 @@ public class AnimalService {
             throw new RegraNegocioException("A data de saída não pode ser anterior ao nascimento.");
         }
         animal.setDataSaida(data);
+    }
+
+    static void validarCategoria(String categoria) {
+        if (categoria == null || !(Animal.CATEGORIAS_FEMEA.contains(categoria) || Animal.CATEGORIAS_MACHO.contains(categoria))) {
+            throw new RegraNegocioException("Categoria inválida: " + categoria
+                    + ". Use Bezerra, Novilha, Vaca lactante, Vaca seca, Bezerro ou Touro.");
+        }
     }
 
     public void remover(Long id) {

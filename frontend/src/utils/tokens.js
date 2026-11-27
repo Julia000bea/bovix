@@ -30,7 +30,12 @@ export const fDisplay ={ fontFamily: "'Zilla Slab', serif" };
 export const fBody = { fontFamily: "'Inter', sans-serif" };
 export const fMono = { fontFamily: "'IBM Plex Mono', monospace" };
 
-export const CATEGORIAS = ["Bezerra", "Novilha", "Vaca lactante", "Vaca seca"];
+export const CATEGORIAS_FEMEA = ["Bezerra", "Novilha", "Vaca lactante", "Vaca seca"];
+export const CATEGORIAS_MACHO = ["Bezerro", "Touro"];
+export const CATEGORIAS = [...CATEGORIAS_FEMEA, ...CATEGORIAS_MACHO];
+/** Bezerro ou touro: fica fora de reprodução e ordenha. */
+export const ehMacho = (animal) => CATEGORIAS_MACHO.includes(animal?.categoria);
+export const RACAS = ["Holandês", "Jersey", "Red Angus", "Angus Preto"];
 export const STATUS_ANIMAL = ["Ativa", "Vendida", "Morta"];
 export const CATEGORIAS_GASTO = ["Ração", "Insumos", "Medicamentos", "Mão de obra", "Manutenção", "Outros"];
 export const CATEGORIAS_RECEITA = ["Venda de leite", "Outros"];
