@@ -1,3 +1,37 @@
+# Modo offline (27/11/2026)
+
+O Bovix agora funciona sem internet — pensado para o curral e a sala de ordenha, onde o sinal falha.
+
+## Como funciona
+- **App instalável (PWA)**: no celular, abra o site e escolha "Adicionar à tela inicial" / "Instalar app".
+  As telas ficam guardadas no aparelho e o sistema abre mesmo sem internet.
+- **Dados guardados no aparelho**: cada consulta à API guarda uma cópia (IndexedDB). Sem internet,
+  a tela mostra essa cópia e avisa de quando ela é.
+- **Lançamentos offline**: ordenha, reprodução, saúde (por animal e para o rebanho) e financeiro
+  podem ser lançados sem internet. Ficam numa fila no aparelho, aparecem na tela como
+  "aguardando envio" e são enviados sozinhos quando o sinal volta (também ao reabrir o app e a cada 30 s).
+  Botão "Enviar agora" na faixa de aviso.
+- **Recusados pela API** (ex.: data no futuro): ficam listados na faixa de aviso para tentar de novo ou descartar.
+- **Precisa de internet**: login, cadastrar/editar animal, foto, excluir registros já enviados,
+  configurações, importar CSV, Ocorrências e Indicadores (estes mostram a última cópia, se houver).
+
+## Cuidados
+- É preciso abrir o Bovix **uma vez com internet** em cada aparelho para ele guardar os dados.
+- Sair da conta apaga a cópia dos dados do aparelho, mas **não** a fila: ela é enviada quando a
+  mesma conta entrar de novo.
+- O login vale 7 dias. Se expirar com lançamentos na fila, a faixa pede para entrar de novo — nada se perde.
+- Se o sinal cair exatamente durante o envio, um lançamento pode chegar duas vezes. Confira a lista
+  depois de sincronizar se o sinal estava muito instável.
+
+## Arquivos
+- `frontend/src/services/offline.js` — IndexedDB (cópias e fila) e estado do modo offline.
+- `frontend/src/services/api.js` — cópia automática dos GETs, fila nos lançamentos, sincronização.
+- `frontend/src/services/provisorio.js` — registros mostrados até o envio.
+- `frontend/src/components/OfflineBanner.jsx` — faixa de aviso (sem internet, pendentes, recusados).
+- `frontend/vite.config.js` — PWA (`vite-plugin-pwa`): manifest, ícones e service worker.
+
+---
+
 # Revisão de produção — mudanças (22/11/2026)
 
 ## Antes de subir
