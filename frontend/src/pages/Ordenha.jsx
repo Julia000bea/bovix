@@ -170,6 +170,7 @@ export default function Ordenha({ data }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium" style={{ color: C.ink }}>
                   {r.animalId ? rotuloAnimal(animais.find((a) => a.id === r.animalId)) : "Total do rebanho"} · {r.periodo}
+                  {r.pendente && <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: C.pasto50, color: C.inkSoft, border: `1px dashed ${C.line}` }}>aguardando envio</span>}
                   {r.estimado && <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: C.brinco + "22", color: C.brincoDark }}>estimado · coleta de {r.diasColeta} dias</span>}
                 </p>
               </div>

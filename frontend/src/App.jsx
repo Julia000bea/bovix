@@ -3,6 +3,7 @@ import { Loader2, LogOut } from "lucide-react";
 import Header from "./components/Header";
 import TabNav from "./components/TabNav";
 import SettingsPanel from "./components/SettingsPanel";
+import OfflineBanner from "./components/OfflineBanner";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Rebanho from "./pages/Rebanho";
@@ -71,6 +72,7 @@ function AppLogado({ auth }) {
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.pasto50, ...fBody }}>
       <Header onToggleSettings={() => setSettingsOpen((o) => !o)} usuario={auth.usuario} onLogout={auth.logout} />
+      <OfflineBanner />
       {settingsOpen && (
         <div className="px-4 sm:px-6" style={{ backgroundColor: C.pasto900 }}>
           <div className="max-w-5xl mx-auto pb-4">

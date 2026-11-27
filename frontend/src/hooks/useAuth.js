@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { authService } from "../services/authService";
-import { authStorage } from "../services/api";
+import { authStorage, ErroDeConexao } from "../services/api";
 
 export function useAuth() {
   const [usuario, setUsuario] = useState(null);
@@ -17,10 +17,12 @@ export function useAuth() {
       return;
     }
     try {
+      // sem internet, /auth/me devolve a cópia guardada no aparelho: a sessão continua offline
       const resp = await authService.me();
       if (resp) setUsuario(resp.usuario);
-    } catch {
-      authStorage.clear();
+    } catch (e) {
+      // sem internet e sem cópia: mantém o token para entrar sozinho quando a conexão voltar
+      if (!(e instanceof ErroDeConexao)) authStorage.clear();
     } finally {
       setCarregando(false);
     }

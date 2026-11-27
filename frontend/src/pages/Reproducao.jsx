@@ -58,7 +58,8 @@ export default function Reproducao({ data }) {
         previsaoParto: form.tipo === "prenhez_confirmada" ? form.previsaoParto || null : null,
       });
       setReproducao((prev) => [...prev, criado]);
-      await sincronizarAnimal(criado.animalId, criado.tipo);
+      // lançado sem internet: a categoria do animal é atualizada quando a fila for enviada
+      if (!criado.pendente) await sincronizarAnimal(criado.animalId, criado.tipo);
 
       if (continuar) {
         const tipo = TIPOS_REPRO.find((t) => t.v === criado.tipo)?.l || criado.tipo;
