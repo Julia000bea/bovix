@@ -42,6 +42,9 @@ public class ReproducaoService {
         Animal animal = animalRepository.findById(animalId)
                 .orElseThrow(() -> new IllegalArgumentException("Animal não encontrado: " + animalId));
         animalService.verificarPropriedade(animal);
+        if (animal.ehMacho()) {
+            throw new RegraNegocioException("Eventos de reprodução (cio, cobertura, prenhez, parto) são só para fêmeas.");
+        }
         validar(dados);
         dados.setAnimal(animal);
         // campos controlados pelo servidor

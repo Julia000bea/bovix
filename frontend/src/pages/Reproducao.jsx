@@ -214,7 +214,7 @@ export default function Reproducao({ data }) {
         <div className="rounded-xl border bg-white p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.line }}>
           {!registrandoReproducao && (
             <Field label="Animal *">
-              <AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} />
+              <AnimalPicker somenteFemeas animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} />
             </Field>
           )}
           {registrandoReproducao && (

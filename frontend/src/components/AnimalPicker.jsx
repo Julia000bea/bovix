@@ -1,11 +1,13 @@
 import { inputCls, inputStyle } from "./ui";
+import { ehMacho } from "../utils/tokens";
 
 // valor usado quando o registro vale para todos os animais ativos (opção "todoRebanho")
 export const TODO_REBANHO = "todos";
 
-// placeholder: texto da opção vazia; demais props (ex.: data-campo) vão para o <select>
-export default function AnimalPicker({ animais, value, onChange, todoRebanho = false, placeholder = "Selecione o animal…", ...resto }) {
-  const ativos = animais.filter((a) => a.status === "Ativa");
+// placeholder: texto da opção vazia; somenteFemeas: esconde bezerros e touros (reprodução, ordenha);
+// demais props (ex.: data-campo) vão para o <select>
+export default function AnimalPicker({ animais, value, onChange, todoRebanho = false, somenteFemeas = false, placeholder = "Selecione o animal…", ...resto }) {
+  const ativos = animais.filter((a) => a.status === "Ativa" && !(somenteFemeas && ehMacho(a)));
   return (
     <select className={inputCls} style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)} {...resto}>
       <option value="">{placeholder}</option>

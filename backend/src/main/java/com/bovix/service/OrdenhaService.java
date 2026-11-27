@@ -60,6 +60,9 @@ public class OrdenhaService {
             if (!animal.getFazenda().getId().equals(fazendaId)) {
                 throw new AccessDeniedException("Animal não pertence a esta fazenda.");
             }
+            if (animal.ehMacho()) {
+                throw new RegraNegocioException("Ordenha por animal só para fêmeas.");
+            }
             if (dias > 1) {
                 throw new RegraNegocioException("Coleta de vários dias vale só para o total do rebanho, não por animal.");
             }

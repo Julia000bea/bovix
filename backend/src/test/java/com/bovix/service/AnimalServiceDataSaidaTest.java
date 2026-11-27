@@ -3,6 +3,7 @@ package com.bovix.service;
 import com.bovix.model.Animal;
 import com.bovix.repository.AnimalFotoRepository;
 import com.bovix.repository.AnimalRepository;
+import com.bovix.repository.EventoReproducaoRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -18,7 +19,7 @@ class AnimalServiceDataSaidaTest {
 
     private static final LocalDate HOJE = LocalDate.of(2026, 10, 28);
     private final AnimalService service = new AnimalService(mock(AnimalRepository.class), mock(AnimalFotoRepository.class),
-            mock(FazendaService.class), Clock.fixed(Instant.parse("2026-10-28T12:00:00Z"), ZoneId.of("America/Sao_Paulo")));
+            mock(FazendaService.class), mock(EventoReproducaoRepository.class), Clock.fixed(Instant.parse("2026-10-28T12:00:00Z"), ZoneId.of("America/Sao_Paulo")));
 
     private Animal animal(String status) {
         return Animal.builder().id(1L).status(status).build();

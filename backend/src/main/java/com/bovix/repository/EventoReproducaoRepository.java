@@ -8,4 +8,6 @@ import java.util.List;
 public interface EventoReproducaoRepository extends JpaRepository<EventoReproducao, Long> {
     List<EventoReproducao> findByAnimal_Fazenda_IdOrderByDataDesc(Long fazendaId);
     List<EventoReproducao> findByAnimal_IdAndTipoInOrderByDataDesc(Long animalId, Collection<String> tipos);
+
+    boolean existsByAnimal_Id(Long animalId);
 }

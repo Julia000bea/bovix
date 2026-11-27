@@ -7,11 +7,20 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "animais", uniqueConstraints = @UniqueConstraint(columnNames = {"fazenda_id", "brinco"}))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Animal {
+
+    public static final Set<String> CATEGORIAS_FEMEA = Set.of("Bezerra", "Novilha", "Vaca lactante", "Vaca seca");
+    public static final Set<String> CATEGORIAS_MACHO = Set.of("Bezerro", "Touro");
+
+    /** Bezerro ou touro: não tem eventos de reprodução nem ordenha. */
+    public boolean ehMacho() {
+        return CATEGORIAS_MACHO.contains(categoria);
+    }
 
     // Somente leitura no JSON: um id vindo do cliente faria o save() virar UPDATE de outro registro.
     @Id

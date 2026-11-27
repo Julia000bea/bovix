@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Field, Pill, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import PhotoUpload from "../components/PhotoUpload";
-import { C, CATEGORIAS, STATUS_ANIMAL, TIPOS_REPRO, TIPOS_SAUDE, fMono } from "../utils/tokens";
+import { C, CATEGORIAS_FEMEA, CATEGORIAS_MACHO, RACAS, ehMacho, STATUS_ANIMAL, TIPOS_REPRO, TIPOS_SAUDE, fMono } from "../utils/tokens";
 import { formatDate, todayStr } from "../utils/date";
 import { novoAnimal } from "../models/Animal";
 import { animaisService } from "../services/animaisService";
@@ -180,14 +180,14 @@ export default function Rebanho({ data }) {
             <Field label="Raça">
               <select ref={(el) => { camposCadastroRef.current[2] = el; }} className={inputCls} style={inputStyle} value={form.raca} onChange={(e) => setForm({ ...form, raca: e.target.value })} onKeyDown={(e) => avancarCampo(e, 3)}>
                 <option value="">Não informado</option>
-                <option value="Holandês">Holandês</option>
-                <option value="Jersey">Jersey</option>
+                {RACAS.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
             <Field label="Nascimento"><input ref={(el) => { camposCadastroRef.current[3] = el; }} type="date" className={inputCls} style={inputStyle} value={form.nascimento} onChange={(e) => setForm({ ...form, nascimento: e.target.value })} onKeyDown={(e) => avancarCampo(e, 4)} /></Field>
             <Field label="Categoria">
               <select ref={(el) => { camposCadastroRef.current[4] = el; }} className={inputCls} style={inputStyle} value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} onKeyDown={(e) => avancarCampo(e, 5)}>
-                {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
+                <optgroup label="Fêmeas">{CATEGORIAS_FEMEA.map((c) => <option key={c}>{c}</option>)}</optgroup>
+                <optgroup label="Machos">{CATEGORIAS_MACHO.map((c) => <option key={c}>{c}</option>)}</optgroup>
               </select>
             </Field>
             <Field label="Notas"><input ref={(el) => { camposCadastroRef.current[5] = el; }} className={inputCls} style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} onKeyDown={(e) => avancarCampo(e, null)} /></Field>
@@ -225,7 +225,7 @@ export default function Rebanho({ data }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span style={fMono} className="text-lg font-semibold" >#{a.brinco}</span>
                   <span className="font-semibold text-xs" style={{ color: C.ink }}>{a.nome || "Sem nome"}</span>
-                  <Pill color={C.leite}>{a.categoria}</Pill>
+                  <Pill color={ehMacho(a) ? C.terra : C.leite}>{a.categoria}</Pill>
                   {a.status !== "Ativa" && <Pill color={C.terra}>{a.status}</Pill>}
                 </div>
                 <p className="text-xs mt-0.5" style={{ color: C.inkSoft }}>
@@ -291,14 +291,19 @@ export default function Rebanho({ data }) {
                 <input className={inputCls} style={inputStyle} value={formEdicao.nome || ""} onChange={(e) => setFormEdicao({ ...formEdicao, nome: e.target.value })} />
               </Field>
               <Field label="Raça">
-                <input className={inputCls} style={inputStyle} value={formEdicao.raca || ""} onChange={(e) => setFormEdicao({ ...formEdicao, raca: e.target.value })} />
+                <select className={inputCls} style={inputStyle} value={formEdicao.raca || ""} onChange={(e) => setFormEdicao({ ...formEdicao, raca: e.target.value })}>
+                  <option value="">Não informado</option>
+                  {RACAS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {formEdicao.raca && !RACAS.includes(formEdicao.raca) && <option value={formEdicao.raca}>{formEdicao.raca}</option>}
+                </select>
               </Field>
               <Field label="Nascimento">
                 <input type="date" className={inputCls} style={inputStyle} value={formEdicao.nascimento || ""} onChange={(e) => setFormEdicao({ ...formEdicao, nascimento: e.target.value })} />
               </Field>
               <Field label="Categoria">
                 <select className={inputCls} style={inputStyle} value={formEdicao.categoria || ""} onChange={(e) => setFormEdicao({ ...formEdicao, categoria: e.target.value })}>
-                  {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
+                  <optgroup label="Fêmeas">{CATEGORIAS_FEMEA.map((c) => <option key={c}>{c}</option>)}</optgroup>
+                <optgroup label="Machos">{CATEGORIAS_MACHO.map((c) => <option key={c}>{c}</option>)}</optgroup>
                 </select>
               </Field>
               <Field label="Notas">

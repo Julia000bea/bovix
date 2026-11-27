@@ -3,7 +3,7 @@ import { Plus, TrendingUp, Trash2, Upload, Loader2, CheckCircle } from "lucide-r
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
-import { C, fMono } from "../utils/tokens";
+import { C, ehMacho, fMono } from "../utils/tokens";
 import { addDays, formatDate, todayStr } from "../utils/date";
 import { novaOrdenha } from "../models/Ordenha";
 import { rotuloAnimal } from "../models/Animal";
@@ -19,7 +19,7 @@ export default function Ordenha({ data }) {
 
   const [salvoAgora, setSalvoAgora] = useState("");
   const formRef = useRef(null);
-  const ativos = animais.filter((a) => a.status === "Ativa");
+  const ativos = animais.filter((a) => a.status === "Ativa" && !ehMacho(a)); // mesma lista do seletor
 
   /** Coloca o cursor num campo do formulário (data-campo="animal" | "data" | "periodo" | "litros" | "dias"). */
   const focar = (campo) => {
@@ -191,7 +191,7 @@ export default function Ordenha({ data }) {
           <p className="sm:col-span-2 text-xs" style={{ color: C.inkSoft }}>
             Dica: <strong>Enter</strong> passa para o próximo campo; em Litros, salva e já seleciona o próximo animal.
           </p>
-          <Field label="Animal (opcional — deixe vazio para total do rebanho)"><AnimalPicker data-campo="animal" placeholder="Total do rebanho (sem animal)" animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
+          <Field label="Animal (opcional — deixe vazio para total do rebanho)"><AnimalPicker somenteFemeas data-campo="animal" placeholder="Total do rebanho (sem animal)" animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
           <Field label="Data"><input data-campo="data" type="date" max={todayStr()} className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
           <Field label="Período">
             <select data-campo="periodo" className={inputCls} style={inputStyle} value={form.periodo} onChange={(e) => setForm({ ...form, periodo: e.target.value })}>
