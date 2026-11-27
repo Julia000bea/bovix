@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, CheckCircle, Circle } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Circle, ChevronDown, ChevronRight, Search, Stethoscope, Loader2, X } from "lucide-react";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
 import { C, TIPOS_REPRO, fMono } from "../utils/tokens";
@@ -17,7 +17,9 @@ export default function Reproducao({ data }) {
   const [form, setForm] = useState(novoEventoReproducao());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
-  const [salvoAgora, setSalvoAgora] = useState(""); // confirmação do "Salvar e continuar"
+  const [salvoAgora, setSalvoAgora] = useState("");
+  const [busca, setBusca] = useState("");
+  const [abertos, setAbertos] = useState(() => new Set()); // ids das vacas com o histórico aberto // confirmação do "Salvar e continuar"
   const [registrandoReproducao, setRegistrandoReproducao] = useState(null);
   const [modalReproducao, setModalReproducao] = useState({
     aberta: false,
@@ -167,10 +169,29 @@ export default function Reproducao({ data }) {
 
   const agrupadosPorAnimal = animais.map((animal) => ({
     animal,
-    eventos: reproducao.filter((e) => e.animalId === animal.id).sort((a, b) => new Date(b.data) - new Date(a.data)),
+    eventos: reproducao.filter((e) => e.animalId === animal.id).sort((a, b) => new Date(b.data) - new Date(a.data) || b.id - a.id), // mesmo dia: o registrado por último primeiro
   }));
 
   const comEventos = agrupadosPorAnimal.filter((g) => g.eventos.length > 0);
+
+  // ---- busca e cartões que abrem/fecham
+  const termo = busca.trim().toLowerCase();
+  const filtrados = comEventos.filter(({ animal }) =>
+    !termo || String(animal.brinco).toLowerCase().includes(termo) || (animal.nome || "").toLowerCase().includes(termo));
+  // com a busca apontando para uma vaca só, o histórico dela abre sozinho
+  const estaAberto = (id) => abertos.has(id) || (termo !== "" && filtrados.length === 1);
+  const alternar = (id) => setAbertos((prev) => {
+    const novo = new Set(prev);
+    if (novo.has(id)) novo.delete(id); else novo.add(id);
+    return novo;
+  });
+
+  const registrarDiagnostico = async (animalId, resultado, dataDiagnostico) => {
+    setErro("");
+    const criado = await reproducaoService.criar(animalId, { tipo: "diagnostico_prenhez", data: dataDiagnostico, resultado });
+    setReproducao((prev) => [...prev, criado]);
+    return criado;
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -481,16 +502,71 @@ export default function Reproducao({ data }) {
         </div>
       )}
 
+      {comEventos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={16} color={C.inkSoft} className="absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por brinco ou nome…"
+              className={`${inputCls} w-full pl-9`}
+              style={inputStyle}
+              aria-label="Buscar vaca no histórico por brinco ou nome"
+            />
+            {busca && (
+              <button onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1" aria-label="Limpar busca">
+                <X size={14} color={C.inkSoft} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => setAbertos(new Set(filtrados.map((g) => g.animal.id)))} className="px-3 py-2 rounded-lg text-sm border" style={{ borderColor: C.line, color: C.pasto900, backgroundColor: "#fff" }}>
+            Expandir todas
+          </button>
+          <button onClick={() => setAbertos(new Set())} className="px-3 py-2 rounded-lg text-sm border" style={{ borderColor: C.line, color: C.pasto900, backgroundColor: "#fff" }}>
+            Recolher todas
+          </button>
+        </div>
+      )}
+
       {comEventos.length === 0 ? (
         <EmptyState text="Nenhum evento reprodutivo registrado. Cios, inseminações e partos aparecem aqui." />
+      ) : filtrados.length === 0 ? (
+        <EmptyState text={`Nenhuma vaca com brinco ou nome "${busca.trim()}" no histórico.`} />
       ) : (
-        <div className="flex flex-col gap-4">
-          {comEventos.map(({ animal, eventos }) => (
-            <div key={animal.id} className="rounded-xl border bg-white p-4" style={{ borderColor: C.line }}>
-              <h3 className="font-semibold mb-3" style={{ color: C.ink }}>
-                {rotuloAnimal(animal)}
-              </h3>
-              <div className="space-y-3">
+        <div className="flex flex-col gap-3">
+          {filtrados.map(({ animal, eventos }) => {
+            const aberto = estaAberto(animal.id);
+            const ultimo = eventos[0];
+            const pendente = coberturaAguardandoDiagnostico(eventos);
+            return (
+            <div key={animal.id} className="rounded-xl border bg-white" style={{ borderColor: C.line }}>
+              <button
+                onClick={() => alternar(animal.id)}
+                className="w-full flex items-center gap-2 p-4 text-left"
+                aria-expanded={aberto}
+              >
+                {aberto ? <ChevronDown size={18} color={C.inkSoft} /> : <ChevronRight size={18} color={C.inkSoft} />}
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold" style={{ color: C.ink }}>{rotuloAnimal(animal)}</h3>
+                  <p className="text-xs" style={{ color: C.inkSoft }}>
+                    {eventos.length} evento(s) · último: {nomeEvento(ultimo)} em {formatDate(ultimo.data)}
+                  </p>
+                </div>
+                {pendente && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold shrink-0" style={{ backgroundColor: C.brinco + "22", color: C.brincoDark }}>
+                    Aguardando diagnóstico
+                  </span>
+                )}
+              </button>
+
+              {pendente && (
+                <DiagnosticoRapido animalId={animal.id} cobertura={pendente} onRegistrar={registrarDiagnostico} />
+              )}
+
+              {aberto && (
+              <div className="space-y-3 px-4 pb-4">
                 {eventos.map((e) => (
                   <div key={e.id} className="p-3 rounded-lg border" style={{ borderColor: C.line, backgroundColor: "#fafaf8" }}>
                     <div className="flex items-start gap-3">
@@ -567,10 +643,76 @@ export default function Reproducao({ data }) {
                   </div>
                 ))}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
+
+const nomeEvento = (e) =>
+  e.dataConfirmacao ? "Cio confirmado" : TIPOS_REPRO.find((t) => t.v === e.tipo)?.l || e.tipo;
+
+/**
+ * Cobertura mais recente que ainda espera o diagnóstico de prenhez (eventos do mais recente ao mais antigo).
+ * Diagnóstico, prenhez confirmada, perda, parto, novo cio, secagem ou pré-parto depois dela encerram a espera.
+ */
+function coberturaAguardandoDiagnostico(eventos) {
+  for (const e of eventos) {
+    if (["inseminacao", "reproducao"].includes(e.tipo)) return e;
+    if (["diagnostico_prenhez", "prenhez_confirmada", "perda_gestacional", "parto",
+      "cio_detectado", "cio_confirmado", "secagem", "pre_parto"].includes(e.tipo)) return null;
+  }
+  return null;
+}
+
+/** Registra o diagnóstico de prenhez direto no histórico: escolhe o resultado e confirma com a data. */
+function DiagnosticoRapido({ animalId, cobertura, onRegistrar }) {
+  const [resultado, setResultado] = useState(null);
+  const [data, setData] = useState(todayStr());
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const dias = Math.round((new Date(todayStr()) - new Date(cobertura.data)) / 86400000);
+
+  const confirmar = async () => {
+    setSalvando(true);
+    setErro("");
+    try {
+      await onRegistrar(animalId, resultado, data); // o aviso some porque a cobertura deixa de estar pendente
+    } catch (e) {
+      setErro(e.message || "Não foi possível registrar o diagnóstico.");
+      setSalvando(false);
+    }
+  };
+
+  const botao = "px-3 py-1.5 rounded-lg text-sm font-semibold";
+  return (
+    <div className="mx-4 mb-3 rounded-lg px-3 py-2 flex flex-wrap items-center gap-2" style={{ backgroundColor: C.brinco + "14" }}>
+      <Stethoscope size={16} color={C.brincoDark} />
+      <span className="text-sm" style={{ color: C.ink }}>
+        {nomeEvento(cobertura)} em {formatDate(cobertura.data)} ({dias} dias)
+        {!resultado && " — resultado do diagnóstico:"}
+      </span>
+      {!resultado ? (
+        <>
+          <button onClick={() => setResultado("prenhe")} className={botao} style={{ backgroundColor: C.pasto900, color: "#fff" }}>Prenhe</button>
+          <button onClick={() => setResultado("vazia")} className={`${botao} border`} style={{ borderColor: C.pasto900, color: C.pasto900, backgroundColor: "#fff" }}>Vazia</button>
+        </>
+      ) : (
+        <>
+          <span className="text-sm" style={{ color: C.ink }}>registrar como <strong>{resultado === "prenhe" ? "PRENHE" : "VAZIA"}</strong> em</span>
+          <input type="date" value={data} min={cobertura.data} max={todayStr()} onChange={(e) => e.target.value && setData(e.target.value)}
+            className={inputCls} style={inputStyle} aria-label="Data do diagnóstico" />
+          <button onClick={confirmar} disabled={salvando} className={`${botao} flex items-center gap-1`} style={{ backgroundColor: C.brinco, color: "#fff" }}>
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Confirmar
+          </button>
+          <button onClick={() => { setResultado(null); setErro(""); }} disabled={salvando} className="px-2 py-1.5 text-sm" style={{ color: C.inkSoft }}>Cancelar</button>
+        </>
+      )}
+      {erro && <p className="w-full text-xs" style={{ color: C.cio }} role="alert">{erro}</p>}
     </div>
   );
 }
