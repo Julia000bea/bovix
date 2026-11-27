@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, TrendingUp, Trash2, Upload, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, TrendingUp, Trash2, Upload, Loader2, CheckCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Field, EmptyState, ErrorText, inputCls, inputStyle } from "../components/ui";
 import AnimalPicker from "../components/AnimalPicker";
@@ -17,21 +17,76 @@ export default function Ordenha({ data }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  const add = async () => {
-    if (!form.litros) return;
+  const [salvoAgora, setSalvoAgora] = useState("");
+  const formRef = useRef(null);
+  const ativos = animais.filter((a) => a.status === "Ativa");
+
+  /** Coloca o cursor num campo do formulário (data-campo="animal" | "data" | "periodo" | "litros" | "dias"). */
+  const focar = (campo) => {
+    setTimeout(() => {
+      const el = formRef.current?.querySelector(`[data-campo="${campo}"]`);
+      el?.focus();
+      if (el?.select && el.tagName === "INPUT" && el.type !== "date") el.select();
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (open) focar(form.animalId ? "litros" : "animal");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // continuar = true: mantém o formulário aberto (data e período ficam); por animal, já seleciona o próximo
+  const add = async (continuar = false) => {
+    if (!form.litros) {
+      setErro("Informe os litros.");
+      focar("litros");
+      return;
+    }
     setSalvando(true);
     setErro("");
     try {
       const dados = { ...form, diasColeta: form.animalId ? 1 : Number(form.diasColeta) || 1 };
       const criados = await ordenhaService.criar(dados, form.animalId || undefined);
       setOrdenha((prev) => [...prev, ...criados]);
-      setForm(novaOrdenha());
-      setOpen(false);
+      if (!continuar) {
+        setSalvoAgora("");
+        setForm(novaOrdenha());
+        setOpen(false);
+        return;
+      }
+      const litrosTxt = Number(form.litros).toLocaleString("pt-BR");
+      if (form.animalId) {
+        const i = ativos.findIndex((a) => String(a.id) === String(form.animalId));
+        const atual = ativos[i];
+        const proximo = ativos[i + 1];
+        setSalvoAgora(`${rotuloAnimal(atual)}: ${litrosTxt} L salvo (${form.periodo}, ${formatDate(form.data)}). `
+          + (proximo ? `Próximo: ${rotuloAnimal(proximo)}.` : "Era o último animal da lista."));
+        setForm({ ...form, animalId: proximo ? String(proximo.id) : "", litros: "" });
+        focar(proximo ? "litros" : "animal");
+      } else {
+        setSalvoAgora(`Total do rebanho: ${litrosTxt} L salvo (${formatDate(form.data)}).`);
+        setForm({ ...form, litros: "", diasColeta: 1 });
+        focar("data");
+      }
     } catch (e) {
+      setSalvoAgora("");
       setErro(e.message || "Não foi possível salvar a ordenha.");
+      focar("litros");
     } finally {
       setSalvando(false);
     }
+  };
+
+  /** Enter passa para o próximo campo; no último campo, salva e continua. */
+  const aoTeclar = (e) => {
+    if (e.key !== "Enter" || e.target.tagName === "BUTTON" || e.target.tagName === "TEXTAREA") return;
+    e.preventDefault();
+    if (salvando) return;
+    const ordem = ["animal", "data", "periodo", "litros", ...(form.animalId ? [] : ["dias"])];
+    const atual = e.target.getAttribute("data-campo");
+    const i = ordem.indexOf(atual);
+    if (i === -1 || i === ordem.length - 1) add(true);
+    else focar(ordem[i + 1]);
   };
 
   const [importando, setImportando] = useState(false);
@@ -126,35 +181,46 @@ export default function Ordenha({ data }) {
           Importar CSV (data;litros)
           <input type="file" accept=".csv,text/csv,text/plain" className="hidden" disabled={importando} onChange={importar} />
         </label>
-        <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.brinco, color: "#fff" }}>
+        <button onClick={() => { setSalvoAgora(""); setOpen((o) => !o); }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: C.brinco, color: "#fff" }}>
           <Plus size={16} /> Registrar ordenha
         </button>
       </div>
 
       {open && (
-        <div className="rounded-xl border bg-white p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.line }}>
-          <Field label="Animal (opcional — deixe vazio para total do rebanho)"><AnimalPicker animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
-          <Field label="Data"><input type="date" className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
+        <div ref={formRef} onKeyDown={aoTeclar} className="rounded-xl border bg-white p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.line }}>
+          <p className="sm:col-span-2 text-xs" style={{ color: C.inkSoft }}>
+            Dica: <strong>Enter</strong> passa para o próximo campo; em Litros, salva e já seleciona o próximo animal.
+          </p>
+          <Field label="Animal (opcional — deixe vazio para total do rebanho)"><AnimalPicker data-campo="animal" placeholder="Total do rebanho (sem animal)" animais={animais} value={form.animalId} onChange={(v) => setForm({ ...form, animalId: v })} /></Field>
+          <Field label="Data"><input data-campo="data" type="date" max={todayStr()} className={inputCls} style={inputStyle} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
           <Field label="Período">
-            <select className={inputCls} style={inputStyle} value={form.periodo} onChange={(e) => setForm({ ...form, periodo: e.target.value })}>
+            <select data-campo="periodo" className={inputCls} style={inputStyle} value={form.periodo} onChange={(e) => setForm({ ...form, periodo: e.target.value })}>
               <option>Manhã</option><option>Tarde</option><option>Dia todo</option>
             </select>
           </Field>
-          <Field label="Litros *"><input type="number" min="0" step="0.1" className={inputCls} style={inputStyle} value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} /></Field>
+          <Field label="Litros *"><input data-campo="litros" type="number" inputMode="decimal" min="0" step="0.1" className={inputCls} style={inputStyle} value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} /></Field>
           {!form.animalId && (
             <div className="sm:col-span-2">
               <Field label="Coleta de quantos dias?">
-                <input type="number" min="1" max="31" className={inputCls} style={inputStyle} value={form.diasColeta} onChange={(e) => setForm({ ...form, diasColeta: e.target.value })} />
+                <input data-campo="dias" type="number" min="1" max="31" className={inputCls} style={inputStyle} value={form.diasColeta} onChange={(e) => setForm({ ...form, diasColeta: e.target.value })} />
               </Field>
               <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
                 Deixe 1 se o volume é deste dia. Se o leite foi coletado a cada N dias, informe N: a data acima é o último dia, e o volume é dividido igualmente entre os N dias (marcados como estimados).
               </p>
             </div>
           )}
-          <div className="sm:col-span-2 flex justify-end gap-2">
-            <button onClick={() => setOpen(false)} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Cancelar</button>
-            <button onClick={add} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
-              {salvando ? "Salvando…" : "Salvar registro"}
+          {salvoAgora && (
+            <p className="sm:col-span-2 text-sm rounded-lg px-3 py-2 flex items-center gap-1.5" style={{ backgroundColor: C.pasto50, color: C.pasto900 }} role="status">
+              <CheckCircle size={16} /> {salvoAgora}
+            </p>
+          )}
+          <div className="sm:col-span-2 flex flex-wrap justify-end gap-2">
+            <button onClick={() => { setOpen(false); setSalvoAgora(""); }} className="px-3 py-2 text-sm rounded-lg" style={{ color: C.inkSoft }}>Fechar</button>
+            <button onClick={() => add(false)} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold border" style={{ borderColor: C.pasto900, color: C.pasto900, backgroundColor: "#fff" }}>
+              Salvar e fechar
+            </button>
+            <button onClick={() => add(true)} disabled={salvando} className="px-4 py-2 text-sm rounded-lg font-semibold" style={{ backgroundColor: C.pasto900, color: "#fff" }}>
+              {salvando ? "Salvando…" : "Salvar e próximo (Enter)"}
             </button>
           </div>
         </div>
